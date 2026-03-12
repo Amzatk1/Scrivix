@@ -9,8 +9,23 @@ type WorkspaceProjectClientProps = {
 };
 
 export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientProps) {
-  const { hydrated, projects, selectProjectFile, syncError, updateProjectDocument } = useScrivix();
+  const {
+    applyProjectRepair,
+    compileProject,
+    compilingProjectSlugs,
+    createProjectFile,
+    createProjectSource,
+    hydrated,
+    projects,
+    repairingProjectSlugs,
+    rollbackProjectRepair,
+    selectProjectFile,
+    syncError,
+    updateProjectDocument,
+  } = useScrivix();
   const project = projects.find((entry) => entry.slug === projectSlug);
+  const isCompiling = compilingProjectSlugs.includes(projectSlug);
+  const isRepairing = repairingProjectSlugs.includes(projectSlug);
 
   if (!project && !hydrated) {
     return (
@@ -67,6 +82,13 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
         </div>
         {syncError && <div className="sync-banner panel">{syncError}</div>}
         <WorkspaceShell
+          isCompiling={isCompiling}
+          isRepairing={isRepairing}
+          onApplyRepair={() => applyProjectRepair(project.slug)}
+          onCompile={() => compileProject(project.slug)}
+          onCreateFile={(fileName) => createProjectFile(project.slug, fileName)}
+          onCreateSource={(input) => createProjectSource(project.slug, input)}
+          onRollbackRepair={() => rollbackProjectRepair(project.slug)}
           onSelectFile={(fileName) => selectProjectFile(project.slug, fileName)}
           onUpdateDocument={(fileName, content) => updateProjectDocument(project.slug, fileName, content)}
           project={project}

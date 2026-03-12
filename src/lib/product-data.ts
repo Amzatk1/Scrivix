@@ -39,9 +39,16 @@ export type OutlineSection = {
 };
 
 export type SourceCard = {
+  id: string;
   title: string;
   detail: string;
   state: string;
+  citationKey: string;
+  sourceType?: "article" | "report" | "book" | "note" | "dataset" | "policy";
+  linkedFiles?: string[];
+  author?: string;
+  year?: string;
+  pinned?: boolean;
 };
 
 export type CommentRecord = {
@@ -61,10 +68,41 @@ export type TrustSignal = {
   tone: StatusTone;
 };
 
+export type EvidenceIssue = {
+  id: string;
+  title: string;
+  detail: string;
+  location: string;
+  recommendation: string;
+  tone: StatusTone;
+};
+
 export type BuildMessage = {
   severity: BuildSeverity;
   location: string;
   text: string;
+};
+
+export type RepairOperation = {
+  fileName: string;
+  summary: string;
+  beforeContent: string;
+  afterContent: string;
+};
+
+export type RepairSuggestion = {
+  id: string;
+  title: string;
+  summary: string;
+  explanation: string;
+  confidenceLabel: string;
+  operations: RepairOperation[];
+};
+
+export type RollbackSnapshot = {
+  label: string;
+  appliedAt: string;
+  documents: Record<string, string>;
 };
 
 export type SearchHit = {
@@ -88,14 +126,15 @@ export type WorkspaceRecord = {
   comments: CommentRecord[];
   history: HistoryEvent[];
   trustSignals: TrustSignal[];
+  evidenceIssues: EvidenceIssue[];
   buildMessages: BuildMessage[];
+  repairSuggestion?: RepairSuggestion | null;
+  rollbackSnapshot?: RollbackSnapshot | null;
   aiAssist: {
     title: string;
     body: string;
   };
   nextStep: string;
-  editorSample: string;
-  previewParagraphs: string[];
   previewCallout: {
     title: string;
     body: string;
@@ -208,13 +247,13 @@ export const projects: ProjectRecord[] = [
     ],
     workspace: {
       defaultMode: "Research",
-      currentFile: "chapter-03-methodology.tex",
+      currentFile: "chapters/chapter-03-methodology.tex",
       documents: {
         "main.tex": `\\documentclass{report}
 \\begin{document}
 \\input{chapters/chapter-03-methodology}
 \\end{document}`,
-        "chapter-03-methodology.tex": `\\section{Methodology}
+        "chapters/chapter-03-methodology.tex": `\\section{Methodology}
 
 This chapter explains the research design, data collection strategy, and
 analysis workflow used to evaluate institutional adoption of AI-native writing
@@ -232,7 +271,9 @@ assistants.
 
 The research design combines interview data, workflow diaries, and analysis of
 document artefacts produced during the study. This allows the project to assess
-both perceived usability and observable writing outcomes.`,
+both perceived usability and observable writing outcomes.
+
+\\badmacro{Comparative workflow view}`,
         "references.bib": `@article{crawford2024methods,
   title = {Benchmarking Methods for AI Writing Workflows},
   author = {Crawford, Elena and Shah, Ravi},
@@ -251,10 +292,10 @@ both perceived usability and observable writing outcomes.`,
       compileTone: "warn",
       editorChips: ["Section-aware AI", "Citations on", "Strict sync"],
       files: [
-        { name: "main.tex", type: "root", active: true },
+        { name: "main.tex", type: "root" },
         { name: "frontmatter/", type: "folder" },
         { name: "chapters/", type: "folder" },
-        { name: "chapter-03-methodology.tex", type: "file" },
+        { name: "chapters/chapter-03-methodology.tex", type: "file", active: true },
         { name: "references.bib", type: "bib" },
         { name: "figures/", type: "folder" },
         { name: "submission-checklist.md", type: "file" },
@@ -270,9 +311,38 @@ both perceived usability and observable writing outcomes.`,
         { term: "mixed methods", summary: "3 source highlights, 2 chapter mentions" },
       ],
       sources: [
-        { title: "Crawford et al. (2024)", detail: "Methods benchmark / pages 14-18", state: "Linked to 3.2" },
-        { title: "UK AI Safety Report", detail: "Claim coverage review", state: "Uncited" },
-        { title: "Supervisor interview notes", detail: "Private source note", state: "Pinned" },
+        {
+          id: "source-methods-benchmark",
+          title: "Crawford et al. (2024)",
+          detail: "Methods benchmark / pages 14-18",
+          state: "Linked to 3.2",
+          citationKey: "crawford2024methods",
+          sourceType: "article",
+          linkedFiles: ["chapters/chapter-03-methodology.tex"],
+          author: "Crawford",
+          year: "2024",
+        },
+        {
+          id: "source-uk-ai-safety",
+          title: "UK AI Safety Report",
+          detail: "Claim coverage review",
+          state: "Uncited",
+          citationKey: "ukaisafetyreport2025",
+          sourceType: "report",
+          author: "UK AI Safety Institute",
+          year: "2025",
+        },
+        {
+          id: "source-supervisor-notes",
+          title: "Supervisor interview notes",
+          detail: "Private source note",
+          state: "Pinned",
+          citationKey: "supervisornotes2026",
+          sourceType: "note",
+          author: "Supervisor notes",
+          year: "2026",
+          pinned: true,
+        },
       ],
       comments: [
         {
@@ -296,6 +366,16 @@ both perceived usability and observable writing outcomes.`,
         { label: "Unsupported claims", value: "5", tone: "warn" },
         { label: "Style shift alerts", value: "2", tone: "neutral" },
         { label: "Bibliography health", value: "Healthy", tone: "good" },
+      ],
+      evidenceIssues: [
+        {
+          id: "issue-methodology-sampling",
+          title: "Potential evidence gap",
+          detail: "The sampling rationale is still stated without a linked methodological source.",
+          location: "chapters/chapter-03-methodology.tex",
+          recommendation: "Attach a source on sampling validity or narrow the claim.",
+          tone: "warn",
+        },
       ],
       buildMessages: [
         {
@@ -321,30 +401,6 @@ both perceived usability and observable writing outcomes.`,
       },
       nextStep:
         "Your methodology section is structurally solid. The highest-value improvement is evidence coverage for the sampling rationale and a smoother transition into data collection.",
-      editorSample: `\\section{Methodology}
-
-This chapter explains the research design, data collection strategy, and
-analysis workflow used to evaluate institutional adoption of AI-native writing
-systems. The aim is to justify the methodological choices in a way that is
-transparent, reproducible, and aligned with the dissertation rubric.
-
-The project uses a mixed-methods design. First, the study maps the workflow
-friction experienced by postgraduate writers across planning, drafting,
-citation management, and final submission. Second, it evaluates how an
-integrated workspace changes that experience when compared with fragmented tool
-chains built around word processors, note systems, and general-purpose AI
-assistants.
-
-\\subsection{Research design}
-
-The research design combines interview data, workflow diaries, and analysis of
-document artefacts produced during the study. This allows the project to assess
-both perceived usability and observable writing outcomes.`,
-      previewParagraphs: [
-        "Methodology",
-        "This chapter explains the research design, data collection strategy, and analysis workflow used to evaluate institutional adoption of AI-native writing systems.",
-        "The project uses a mixed-methods design to compare fragmented writing toolchains against an integrated workspace model.",
-      ],
       previewCallout: {
         title: "Needs evidence",
         body: "Sampling claim in paragraph 4 should cite a methodological source.",
@@ -401,11 +457,11 @@ tone: formal`,
       compileTone: "warn",
       editorChips: ["Claim coverage", "Formal tone", "Executive summary linked"],
       files: [
-        { name: "brief.svx", type: "root", active: true },
+        { name: "brief.svx", type: "root" },
         { name: "sections/", type: "folder" },
-        { name: "recommendations.svx", type: "file" },
+        { name: "sections/recommendations.svx", type: "file", active: true },
         { name: "sources/", type: "folder" },
-        { name: "evidence-register.csv", type: "asset" },
+        { name: "sources/evidence-register.csv", type: "asset" },
         { name: "export-profile.yml", type: "config" },
       ],
       outline: [
@@ -419,9 +475,38 @@ tone: formal`,
         { term: "procurement", summary: "1 source note, 1 appendix table" },
       ],
       sources: [
-        { title: "National Audit Office review", detail: "Public sector AI governance", state: "Linked to section 2" },
-        { title: "Internal procurement policy", detail: "Private team source", state: "Pinned" },
-        { title: "OECD AI policy framework", detail: "Comparative reference", state: "Candidate citation" },
+        {
+          id: "source-nao-review",
+          title: "National Audit Office review",
+          detail: "Public sector AI governance",
+          state: "Linked to section 2",
+          citationKey: "naoaigovernance2025",
+          sourceType: "report",
+          linkedFiles: ["brief.svx"],
+          author: "National Audit Office",
+          year: "2025",
+        },
+        {
+          id: "source-procurement-policy",
+          title: "Internal procurement policy",
+          detail: "Private team source",
+          state: "Pinned",
+          citationKey: "internalprocurementpolicy2026",
+          sourceType: "policy",
+          author: "Operations team",
+          year: "2026",
+          pinned: true,
+        },
+        {
+          id: "source-oecd-framework",
+          title: "OECD AI policy framework",
+          detail: "Comparative reference",
+          state: "Candidate citation",
+          citationKey: "oecdaipolicy2024",
+          sourceType: "policy",
+          author: "OECD",
+          year: "2024",
+        },
       ],
       comments: [
         {
@@ -446,6 +531,16 @@ tone: formal`,
         { label: "Style shift alerts", value: "1", tone: "neutral" },
         { label: "Review readiness", value: "In progress", tone: "neutral" },
       ],
+      evidenceIssues: [
+        {
+          id: "issue-policy-recommendations",
+          title: "Potential evidence gap",
+          detail: "The recommendation list introduces three controls without any attached evidence markers.",
+          location: "sections/recommendations.svx",
+          recommendation: "Attach the procurement policy and one public framework source before export.",
+          tone: "warn",
+        },
+      ],
       buildMessages: [
         {
           severity: "warn",
@@ -465,22 +560,6 @@ tone: formal`,
       },
       nextStep:
         "This document is close to stakeholder-ready. The blocking issue is evidence coverage in section 2 and sharper near-term recommendations in the summary.",
-      editorSample: `## Recommendations
-
-The department should adopt a staged governance model for AI-enabled writing
-systems. In the first ninety days, procurement and assurance teams should
-define a minimum evidence standard for any system used in high-stakes drafting.
-
-The operating model should require three controls. First, every generated claim
-used in policy drafting must be linked to a verifiable source or marked for
-review. Second, document review workflows should preserve revision provenance.
-Third, export profiles should ensure that the final briefing pack remains
-consistent across internal and external circulation.`,
-      previewParagraphs: [
-        "Recommendations",
-        "The department should adopt a staged governance model for AI-enabled writing systems.",
-        "In the first ninety days, procurement and assurance teams should define a minimum evidence standard for high-stakes drafting.",
-      ],
       previewCallout: {
         title: "Review note",
         body: "Legal review recommends narrower language for Recommendation 3 before circulation.",
@@ -535,9 +614,9 @@ submission readiness in one product shell.`,
       compileTone: "neutral",
       editorChips: ["Narrative consistency", "Investor mode", "Appendix split export"],
       files: [
-        { name: "narrative.md", type: "root", active: true },
+        { name: "narrative.md", type: "root" },
         { name: "appendix/", type: "folder" },
-        { name: "system-architecture.md", type: "file" },
+        { name: "appendix/system-architecture.md", type: "file", active: true },
         { name: "market-evidence.md", type: "file" },
         { name: "exports/", type: "folder" },
       ],
@@ -552,8 +631,28 @@ submission readiness in one product shell.`,
         { term: "university", summary: "3 GTM notes, 1 market evidence section" },
       ],
       sources: [
-        { title: "Market interview synthesis", detail: "Founder research notes", state: "Linked to market section" },
-        { title: "Workflow benchmark deck", detail: "Internal analysis", state: "Pinned" },
+        {
+          id: "source-market-interviews",
+          title: "Market interview synthesis",
+          detail: "Founder research notes",
+          state: "Linked to market section",
+          citationKey: "marketinterviews2026",
+          sourceType: "note",
+          linkedFiles: ["market-evidence.md"],
+          author: "Founder research",
+          year: "2026",
+        },
+        {
+          id: "source-benchmark-deck",
+          title: "Workflow benchmark deck",
+          detail: "Internal analysis",
+          state: "Pinned",
+          citationKey: "workflowbenchmark2026",
+          sourceType: "report",
+          author: "Internal analysis",
+          year: "2026",
+          pinned: true,
+        },
       ],
       comments: [
         {
@@ -577,6 +676,16 @@ submission readiness in one product shell.`,
         { label: "Narrative consistency", value: "Needs pass", tone: "neutral" },
         { label: "Style shift alerts", value: "0", tone: "good" },
       ],
+      evidenceIssues: [
+        {
+          id: "issue-investor-architecture",
+          title: "Potential evidence gap",
+          detail: "The moat argument in the architecture section would benefit from one supporting benchmark reference.",
+          location: "appendix/system-architecture.md",
+          recommendation: "Attach one benchmark source or reduce the strength of the claim.",
+          tone: "neutral",
+        },
+      ],
       buildMessages: [
         {
           severity: "info",
@@ -591,21 +700,6 @@ submission readiness in one product shell.`,
       },
       nextStep:
         "The document is clear, but the architecture section needs one plainer-language pass and the expansion model needs a sharper business framing.",
-      editorSample: `## Architecture
-
-Scrivix is built as a modular document system rather than a general-purpose
-editor with AI bolted on. The product keeps document state, source state, build
-state, and review state in one workspace so users do not need to reconstruct
-context across tools.
-
-This matters because the moat is not just model access. It is the combination
-of structured document workflows, safe diff application, evidence grounding, and
-submission readiness in one product shell.`,
-      previewParagraphs: [
-        "Architecture",
-        "Scrivix is built as a modular document system rather than a general-purpose editor with AI bolted on.",
-        "The moat comes from structured workflows, safe diffs, evidence grounding, and submission readiness.",
-      ],
       previewCallout: {
         title: "Audience prompt",
         body: "Consider one simpler paragraph for generalist investors before the deeper systems explanation.",

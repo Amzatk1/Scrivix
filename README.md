@@ -7,6 +7,7 @@ Scrivix is an AI-native workspace for serious documents. This scaffold establish
 - project browser at `/projects`
 - template gallery at `/templates`
 - new-project flow at `/projects/new`
+- import flow at `/projects/import`
 - desktop-first editor workspace prototype at `/workspace/[projectSlug]`
 
 ## Stack
@@ -31,15 +32,26 @@ This first pass focuses on the product shell rather than backend systems:
 - project browser and template gallery
 - starter project creation flow with local persistence
 - project navigation and outline panes
+- mode-aware editor primitives for code and structured writing
+- Tiptap-based hybrid editor for `.svx` documents
 - editable document surface and derived preview
+- import flow for pasted markdown, LaTeX, and prose drafts
+- file-upload import for `.docx`, `.md`, `.tex`, and zipped LaTeX projects
+- structure-preserving archive import for multi-file LaTeX workspaces
+- bibliography import into the native source library
+- citation insertion from the workspace source pane
+- evidence-gap and citation-health signals in the trust pane
 - right-side utility tabs for AI, sources, comments, trust, and history
 - bottom build console
 - API-backed project store persisted to `data/projects.json`
+- compile action wired through a worker-backed build runner with `latexmk` detection and fallback analysis
+- API-backed file creation from the workspace tree
+- API-backed imported project creation
 - branded landing and dashboard screens
 
 ## Next implementation priorities
 
 1. Replace the filesystem-backed JSON store with a database-backed project model.
-2. Add real editor primitives for rich text and LaTeX/Markdown modes.
-3. Implement import flows and template instantiation beyond seeded records.
-4. Build the compile pipeline and AI diff-review architecture.
+2. Expand the hybrid editor into a fuller semantic block system with citations, tables, and figures.
+3. Expand the repair layer from deterministic patches into broader diff-reviewed agent workflows.
+4. Add deeper version history and compare workflows for serious review cycles.

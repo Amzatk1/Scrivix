@@ -1,83 +1,108 @@
 import Link from "next/link";
-import { focusAreas, navLinks, projects, templates } from "@/lib/product-data";
+import { focusAreas, navLinks, templates } from "@/lib/product-data";
 
 export default function HomePage() {
   return (
-    <main className="marketing-page">
+    <main className="landing-page">
       <header className="marketing-nav">
-        <div className="brand-lockup">
-          <span className="brand-mark">S</span>
-          <div>
-            <strong>Scrivix</strong>
-            <p>The intelligent workspace for serious writing.</p>
-          </div>
-        </div>
-
-        <nav className="marketing-links" aria-label="Primary">
-          {navLinks.map((item) => (
-            <a key={item.label} href={item.href}>
-              {item.label}
+        <Link className="brand-mark" href="/">
+          Scrivix
+        </Link>
+        <nav className="marketing-nav__links" aria-label="Primary">
+          {navLinks.map((link) => (
+            <a key={link.label} href={link.href}>
+              {link.label}
             </a>
           ))}
         </nav>
-
-        <div className="marketing-actions">
-          <Link className="ghost-button" href="/templates">
-            Browse templates
+        <div className="marketing-nav__actions">
+          <Link className="ghost-button" href="/projects">
+            Open app
+          </Link>
+          <Link className="ghost-button" href="/projects/import">
+            Import draft
           </Link>
           <Link className="primary-button" href="/projects/new">
-            Create project
+            Start workspace
           </Link>
         </div>
       </header>
 
-      <section className="hero" id="product">
-        <div className="hero-copy">
-          <p className="eyebrow">AI-native document operating system</p>
-          <h1>Serious writing needs more than an editor.</h1>
-          <p className="hero-text">
-            Scrivix combines an Overleaf-familiar workspace, source-grounded AI, and submission-grade document
-            workflows for theses, reports, proposals, and technical writing.
-          </p>
+      <section className="hero-shell panel" id="product">
+        <div className="hero-grid">
+          <div className="hero-copy">
+            <p className="eyebrow">The intelligent workspace for serious writing</p>
+            <h1>Write, ground, review, repair, and submit serious documents in one system.</h1>
+            <p className="dashboard-subtitle">
+              Scrivix combines the file-aware familiarity of Overleaf with source-native research workflows,
+              diff-first AI assistance, and a calm workspace built for high-stakes writing.
+            </p>
 
-          <div className="hero-actions">
-            <Link className="primary-button" href={`/workspace/${projects[0]?.slug ?? ""}`}>
-              Explore the workspace
-            </Link>
-            <Link className="ghost-button" href="/dashboard">
-              View dashboard
-            </Link>
-          </div>
-        </div>
+            <div className="hero-actions">
+              <Link className="primary-button" href="/projects/new">
+                Create your first project
+              </Link>
+              <Link className="ghost-button" href="/projects/import">
+                Import an existing draft
+              </Link>
+              <Link className="ghost-button" href="/dashboard">
+                View dashboard
+              </Link>
+            </div>
 
-        <div className="hero-panel panel">
-          <div className="hero-panel__header">
-            <span className="status-pill status-pill--good">Project healthy</span>
-            <span className="quiet-label">Submission profile loaded</span>
-          </div>
-
-          <div className="hero-grid">
-            {projects.map((project) => (
-              <article key={project.slug} className="project-glance">
-                <p>{project.subtitle}</p>
-                <strong>{project.title}</strong>
-                <span>{project.status}</span>
-                <small>{project.meta}</small>
+            <div className="hero-stats">
+              <article className="hero-stat">
+                <strong>Overleaf-familiar shell</strong>
+                <span>Files, editor, preview, utilities, and build status in one clear layout.</span>
               </article>
-            ))}
+              <article className="hero-stat">
+                <strong>Source-grounded AI</strong>
+                <span>Context-aware assistance tied to sections, sources, comments, and build state.</span>
+              </article>
+              <article className="hero-stat">
+                <strong>Submission-ready workflows</strong>
+                <span>From first outline to final export with evidence checks and compile repair.</span>
+              </article>
+            </div>
+          </div>
+
+          <div className="hero-preview">
+            <div className="hero-preview__panel">
+              <div className="hero-preview__top">
+                <span className="status-pill status-pill--warn">Build warnings</span>
+                <span className="quiet-label">Imperial thesis · methodology</span>
+              </div>
+              <div className="hero-preview__body">
+                <div className="hero-preview__column">
+                  <p className="eyebrow">Workspace</p>
+                  <strong>Files · Draft · Preview · Sources · Trust</strong>
+                  <p>
+                    A calmer three-pane shell for long-form writing with project navigation, rich or technical editing,
+                    and adjacent review tools.
+                  </p>
+                </div>
+                <div className="hero-preview__column">
+                  <p className="eyebrow">Document health</p>
+                  <ul>
+                    <li>3 evidence gaps surfaced in the current chapter</li>
+                    <li>1 bibliography key ready to insert</li>
+                    <li>Compile-fix patch prepared for one macro issue</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="focus-section" id="workspace">
+      <section className="marketing-section" id="workspace">
         <div className="section-heading">
-          <p className="eyebrow">Designed for real document work</p>
-          <h2>The familiar workspace, rebuilt for modern writing.</h2>
+          <p className="eyebrow">Product pillars</p>
+          <h2>A serious-document operating system, not an AI text box.</h2>
         </div>
-
-        <div className="feature-grid">
+        <div className="focus-grid">
           {focusAreas.map((area) => (
-            <article key={area.title} className="feature-card panel">
+            <article key={area.title} className="panel marketing-card">
               <h3>{area.title}</h3>
               <p>{area.description}</p>
             </article>
@@ -85,37 +110,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="proof-section" id="research">
-        <div className="proof-copy">
-          <p className="eyebrow">What makes Scrivix different</p>
-          <h2>One workspace for drafting, evidence, review, and repair.</h2>
-        </div>
-
-        <div className="proof-panel panel">
-          <div className="proof-column">
-            <h3>Overleaf mental model</h3>
-            <p>Left project tree, dominant editor, adjacent preview, visible compile controls, clear logs.</p>
-          </div>
-          <div className="proof-column">
-            <h3>AI with control</h3>
-            <p>Side-panel chat, inline transforms, build repair diffs, and rollback before anything becomes permanent.</p>
-          </div>
-          <div className="proof-column">
-            <h3>Evidence and trust</h3>
-            <p>Source library, citation health, unsupported-claim prompts, and explainable authorship-risk signals.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="templates-section" id="templates">
+      <section className="marketing-section" id="templates">
         <div className="section-heading">
           <p className="eyebrow">Template system</p>
-          <h2>Start from a serious document workflow, not a blank page.</h2>
+          <h2>Start from a workflow that already understands the document job.</h2>
         </div>
-
-        <div className="template-showcase-grid">
+        <div className="template-gallery-grid">
           {templates.map((template) => (
-            <article key={template.slug} className="template-showcase-card panel">
+            <article key={template.slug} className="template-gallery-card panel">
               <div className="template-showcase-card__top">
                 <span className="template-chip">{template.category}</span>
                 <span className="quiet-label">{template.mode}</span>
@@ -134,43 +136,25 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="pricing-section" id="pricing">
-        <div className="section-heading">
-          <p className="eyebrow">Pricing direction</p>
-          <h2>Built for students first, extensible to teams and institutions.</h2>
-        </div>
-
-        <div className="pricing-grid">
-          <article className="pricing-card panel">
-            <span>Student</span>
-            <strong>Focused drafting, citations, and AI help</strong>
-            <p>Low-friction plan for essays, dissertations, and solo research projects.</p>
-          </article>
-          <article className="pricing-card panel">
-            <span>Pro</span>
-            <strong>Advanced build repair and submission readiness</strong>
-            <p>For power users managing templates, exports, and complex long-form structures.</p>
-          </article>
-          <article className="pricing-card panel">
-            <span>Institution</span>
-            <strong>Templates, policy controls, and secure deployments</strong>
-            <p>For universities, labs, policy teams, and regulated document workflows.</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="launch-cta">
-        <div className="launch-cta__panel panel">
+      <section className="marketing-section marketing-section--cta" id="pricing">
+        <div className="panel cta-panel">
           <div>
-            <p className="eyebrow">Ready to continue building?</p>
-            <h2>Move from template selection into a real project workspace.</h2>
+            <p className="eyebrow">Launch path</p>
+            <h2>Build the thesis, report, or technical document workspace people actually want to stay in.</h2>
+            <p className="dashboard-subtitle">
+              Start with a real project, then grow into sources, review, compile repair, and submission workflows
+              without switching tools.
+            </p>
           </div>
-          <div className="launch-cta__actions">
-            <Link className="ghost-button" href="/templates">
-              View all templates
-            </Link>
+          <div className="hero-actions">
             <Link className="primary-button" href="/projects/new">
-              Start a project
+              Start a serious document
+            </Link>
+            <Link className="ghost-button" href="/projects/import">
+              Import a draft
+            </Link>
+            <Link className="ghost-button" href="/templates">
+              Browse templates
             </Link>
           </div>
         </div>

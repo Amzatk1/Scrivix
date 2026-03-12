@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { NewProjectWizard } from "@/components/projects/new-project-wizard";
+import { ImportProjectWizard } from "@/components/projects/import-project-wizard";
 
-type NewProjectPageProps = {
+type ImportProjectPageProps = {
   searchParams?: Promise<{
     template?: string | string[];
   }>;
 };
 
-export default async function NewProjectPage({ searchParams }: NewProjectPageProps) {
+export default async function ImportProjectPage({ searchParams }: ImportProjectPageProps) {
   const resolvedSearchParams = await searchParams;
   const templateParam = resolvedSearchParams?.template;
   const initialTemplateSlug = Array.isArray(templateParam) ? templateParam[0] : templateParam;
@@ -16,10 +16,11 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
     <main className="directory-page">
       <div className="directory-header">
         <div>
-          <p className="eyebrow">New project</p>
-          <h1>Create a serious document workspace.</h1>
+          <p className="eyebrow">Import project</p>
+          <h1>Bring an existing draft into Scrivix.</h1>
           <p className="directory-subtitle">
-            Choose a workflow, set the authoring mode, and start from a product shape designed for real writing.
+            Import markdown, LaTeX, or prose into a serious document workspace with files, sources, outline, and trust
+            state generated up front.
           </p>
         </div>
 
@@ -27,16 +28,13 @@ export default async function NewProjectPage({ searchParams }: NewProjectPagePro
           <Link className="ghost-button" href="/projects">
             Browse projects
           </Link>
-          <Link className="ghost-button" href="/projects/import">
-            Import existing draft
-          </Link>
-          <Link className="ghost-button" href="/templates">
-            Browse templates
+          <Link className="ghost-button" href="/projects/new">
+            Create from template
           </Link>
         </div>
       </div>
 
-      <NewProjectWizard initialTemplateSlug={initialTemplateSlug} />
+      <ImportProjectWizard initialTemplateSlug={initialTemplateSlug} />
     </main>
   );
 }

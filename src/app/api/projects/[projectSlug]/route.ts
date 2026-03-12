@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  applyProjectRepair,
+  createProjectFile,
+  createProjectSource,
   getProject,
+  rollbackProjectRepair,
   selectProjectFile,
   updateProjectDocument,
 } from "@/lib/server/project-store";
@@ -25,14 +29,29 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   const { projectSlug } = await context.params;
   const body = (await request.json().catch(() => null)) as
-    | { action?: string; fileName?: string; content?: string }
+    | {
+        action?: string;
+        fileName?: string;
+        content?: string;
+        source?: {
+          title?: string;
+          detail?: string;
+          author?: string;
+          year?: string;
+          citationKey?: string;
+        };
+      }
     | null;
 
-  if (!body?.action || !body.fileName) {
+  if (!body?.action) {
     return NextResponse.json({ error: "Invalid patch payload." }, { status: 400 });
   }
 
   if (body.action === "selectFile") {
+    if (!body.fileName) {
+      return NextResponse.json({ error: "Missing file name." }, { status: 400 });
+    }
+
     const project = await selectProjectFile(projectSlug, body.fileName);
 
     if (!project) {
@@ -43,7 +62,65 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   if (body.action === "updateDocument" && typeof body.content === "string") {
+    if (!body.fileName) {
+      return NextResponse.json({ error: "Missing file name." }, { status: 400 });
+    }
+
     const project = await updateProjectDocument(projectSlug, body.fileName, body.content);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "createFile") {
+    if (!body.fileName) {
+      return NextResponse.json({ error: "Missing file name." }, { status: 400 });
+    }
+
+    const project = await createProjectFile(projectSlug, body.fileName);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "createSource") {
+    if (!body.source?.title || !body.source?.detail) {
+      return NextResponse.json({ error: "Invalid source payload." }, { status: 400 });
+    }
+
+    const project = await createProjectSource(projectSlug, {
+      title: body.source.title,
+      detail: body.source.detail,
+      author: body.source.author,
+      year: body.source.year,
+      citationKey: body.source.citationKey,
+    });
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "applyRepair") {
+    const project = await applyProjectRepair(projectSlug);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "rollbackRepair") {
+    const project = await rollbackProjectRepair(projectSlug);
 
     if (!project) {
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
@@ -54,4 +131,3 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   return NextResponse.json({ error: "Unsupported patch action." }, { status: 400 });
 }
-

@@ -48,6 +48,9 @@ export function ProjectBrowser() {
           <Link className="ghost-button" href="/templates">
             Browse templates
           </Link>
+          <Link className="ghost-button" href="/projects/import">
+            Import draft
+          </Link>
           <Link className="primary-button" href="/projects/new">
             Create project
           </Link>

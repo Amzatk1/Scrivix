@@ -173,6 +173,12 @@ export function NewProjectWizard({ initialTemplateSlug }: NewProjectWizardProps)
           <button className="primary-button" disabled={isPending} onClick={handleCreateProject} type="button">
             {isPending ? "Creating..." : "Create project"}
           </button>
+          <Link className="ghost-button" href={`/projects/import?template=${selectedTemplate.slug}`}>
+            Import existing draft
+          </Link>
+        </div>
+
+        <div className="wizard-summary__actions">
           <Link className="ghost-button" href={`/projects/new?template=${selectedTemplate.slug}`}>
             Refresh selection
           </Link>
