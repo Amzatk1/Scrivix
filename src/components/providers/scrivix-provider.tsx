@@ -32,15 +32,18 @@ type ScrivixContextValue = {
   syncError: string | null;
   compilingProjectSlugs: string[];
   repairingProjectSlugs: string[];
+  versioningProjectSlugs: string[];
   projects: ProjectRecord[];
   templates: TemplateRecord[];
   createProject: (input: CreateProjectInput) => Promise<ProjectRecord>;
   createImportedProject: (input: ImportProjectInput) => Promise<ProjectRecord>;
   applyProjectRepair: (projectSlug: string) => Promise<void>;
   compileProject: (projectSlug: string) => Promise<void>;
+  createProjectSnapshot: (projectSlug: string, snapshotLabel?: string) => Promise<void>;
   createProjectFile: (projectSlug: string, fileName: string) => Promise<void>;
   createProjectSource: (projectSlug: string, input: SourceDraftInput) => Promise<void>;
   rollbackProjectRepair: (projectSlug: string) => Promise<void>;
+  restoreProjectSnapshot: (projectSlug: string, snapshotId: string) => Promise<void>;
   updateProjectDocument: (projectSlug: string, fileName: string, content: string) => void;
   selectProjectFile: (projectSlug: string, fileName: string) => Promise<void>;
 };
@@ -84,6 +87,7 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [compilingProjectSlugs, setCompilingProjectSlugs] = useState<string[]>([]);
   const [repairingProjectSlugs, setRepairingProjectSlugs] = useState<string[]>([]);
+  const [versioningProjectSlugs, setVersioningProjectSlugs] = useState<string[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>(() => seedProjects.map((project) => applyWorkspaceIntelligence(project)));
   const saveTimersRef = useRef<Record<string, number>>({});
 
@@ -267,6 +271,50 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
     }
   }
 
+  async function createProjectSnapshot(projectSlug: string, snapshotLabel?: string) {
+    startTransition(() => {
+      setVersioningProjectSlugs((current) => [...new Set([...current, projectSlug])]);
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: "Saving snapshot…",
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "createSnapshot",
+          snapshotLabel,
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The snapshot could not be saved.");
+      });
+    } finally {
+      startTransition(() => {
+        setVersioningProjectSlugs((current) => current.filter((slug) => slug !== projectSlug));
+      });
+    }
+  }
+
   async function rollbackProjectRepair(projectSlug: string) {
     startTransition(() => {
       setRepairingProjectSlugs((current) => [...new Set([...current, projectSlug])]);
@@ -306,6 +354,50 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
     } finally {
       startTransition(() => {
         setRepairingProjectSlugs((current) => current.filter((slug) => slug !== projectSlug));
+      });
+    }
+  }
+
+  async function restoreProjectSnapshot(projectSlug: string, snapshotId: string) {
+    startTransition(() => {
+      setVersioningProjectSlugs((current) => [...new Set([...current, projectSlug])]);
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: "Restoring snapshot…",
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "restoreSnapshot",
+          snapshotId,
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The selected snapshot could not be restored.");
+      });
+    } finally {
+      startTransition(() => {
+        setVersioningProjectSlugs((current) => current.filter((slug) => slug !== projectSlug));
       });
     }
   }
@@ -542,15 +634,18 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
         syncError,
         compilingProjectSlugs,
         repairingProjectSlugs,
+        versioningProjectSlugs,
         projects,
         templates,
         createProject,
         createImportedProject,
         applyProjectRepair,
         compileProject,
+        createProjectSnapshot,
         createProjectFile,
         createProjectSource,
         rollbackProjectRepair,
+        restoreProjectSnapshot,
         updateProjectDocument,
         selectProjectFile,
       }}

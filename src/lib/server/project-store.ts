@@ -20,6 +20,7 @@ import {
   type CreateProjectInput,
   type ImportProjectInput,
 } from "@/lib/project-utils";
+import { buildVersionSnapshot } from "@/lib/version-utils";
 import { createFileRecord } from "@/lib/editor-utils";
 
 const dataDirectory = path.join(process.cwd(), "data");
@@ -377,6 +378,46 @@ export async function createProjectSource(projectSlug: string, input: SourceDraf
   return nextProjects.find((project) => project.slug === projectSlug);
 }
 
+export async function createProjectSnapshot(projectSlug: string, label?: string) {
+  const projects = await readProjectsFromDisk();
+  const timestamp = `Today, ${compileTimestamp()}`;
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    const analyzedProject = applyWorkspaceIntelligence(project);
+    const trimmedLabel = label?.trim();
+    const snapshotCount = analyzedProject.workspace.versionSnapshots?.length ?? 0;
+    const snapshotLabel = trimmedLabel || `Snapshot ${snapshotCount + 1}`;
+    const snapshot = buildVersionSnapshot(
+      analyzedProject.workspace,
+      snapshotLabel,
+      timestamp,
+      `snapshot-${Date.now()}`,
+    );
+
+    return applyWorkspaceIntelligence({
+      ...analyzedProject,
+      meta: "Snapshot saved",
+      workspace: {
+        ...analyzedProject.workspace,
+        versionSnapshots: [snapshot, ...(analyzedProject.workspace.versionSnapshots ?? []).slice(0, 11)],
+        history: [
+          {
+            label: "Snapshot saved",
+            meta: snapshotLabel,
+          },
+          ...analyzedProject.workspace.history.slice(0, 4),
+        ],
+      },
+    });
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
 export async function compileProject(projectSlug: string) {
   const projects = await readProjectsFromDisk();
   const timestamp = compileTimestamp();
@@ -498,6 +539,57 @@ export async function rollbackProjectRepair(projectSlug: string) {
       "Repair rolled back",
       rollbackSnapshot.label,
       `Today, ${timestamp}`,
+    );
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function restoreProjectSnapshot(projectSlug: string, snapshotId: string) {
+  const projects = await readProjectsFromDisk();
+  const timestamp = `Today, ${compileTimestamp()}`;
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    const analyzedProject = applyWorkspaceIntelligence(project);
+    const snapshots = analyzedProject.workspace.versionSnapshots ?? [];
+    const snapshot = snapshots.find((entry) => entry.id === snapshotId);
+
+    if (!snapshot) {
+      return {
+        ...analyzedProject,
+        meta: "Snapshot not found",
+      };
+    }
+
+    const safetySnapshot = buildVersionSnapshot(
+      analyzedProject.workspace,
+      `Auto snapshot before restoring ${snapshot.label}`,
+      timestamp,
+      `auto-${Date.now()}`,
+    );
+
+    return buildProjectStatus(
+      {
+        ...analyzedProject,
+        workspace: {
+          ...analyzedProject.workspace,
+          currentFile: snapshot.currentFile,
+          files: snapshot.files.map((file) => ({
+            ...file,
+            active: file.name === snapshot.currentFile,
+          })),
+          documents: cloneRecord(snapshot.documents),
+          versionSnapshots: [safetySnapshot, ...snapshots.filter((entry) => entry.id !== safetySnapshot.id)].slice(0, 12),
+        },
+      },
+      `Restored snapshot at ${compileTimestamp()}`,
+      "Snapshot restored",
+      snapshot.label,
+      timestamp,
     );
   });
 

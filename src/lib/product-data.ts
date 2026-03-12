@@ -1,3 +1,5 @@
+import type { VersionSnapshot } from "@/lib/version-utils";
+
 export type StatusTone = "good" | "warn" | "neutral";
 export type BuildSeverity = "error" | "warn" | "info";
 export type WorkspaceMode = "Draft" | "Research" | "Review" | "Submission";
@@ -125,6 +127,7 @@ export type WorkspaceRecord = {
   sources: SourceCard[];
   comments: CommentRecord[];
   history: HistoryEvent[];
+  versionSnapshots?: VersionSnapshot[];
   trustSignals: TrustSignal[];
   evidenceIssues: EvidenceIssue[];
   buildMessages: BuildMessage[];

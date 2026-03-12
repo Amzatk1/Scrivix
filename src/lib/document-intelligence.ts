@@ -1,6 +1,7 @@
 import type { BuildMessage, EvidenceIssue, ProjectMode, ProjectRecord, SourceCard, TrustSignal } from "@/lib/product-data";
 import { isLikelyHtml, sanitizePreviewHtml } from "@/lib/editor-utils";
 import { deriveRepairSuggestion } from "@/lib/repair-assistant";
+import { ensureVersionSnapshots } from "@/lib/version-utils";
 
 export type SourceDraftInput = {
   title: string;
@@ -317,6 +318,7 @@ export function applyWorkspaceIntelligence(project: ProjectRecord) {
     ...project.workspace,
     wordEstimate: calculateWordEstimate(project),
     sources,
+    versionSnapshots: ensureVersionSnapshots(project.workspace),
     trustSignals,
     evidenceIssues,
     buildMessages: project.workspace.buildMessages ?? ([] as BuildMessage[]),

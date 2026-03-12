@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import {
   applyProjectRepair,
+  createProjectSnapshot,
   createProjectFile,
   createProjectSource,
   getProject,
   rollbackProjectRepair,
+  restoreProjectSnapshot,
   selectProjectFile,
   updateProjectDocument,
 } from "@/lib/server/project-store";
@@ -33,6 +35,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         action?: string;
         fileName?: string;
         content?: string;
+        snapshotId?: string;
+        snapshotLabel?: string;
         source?: {
           title?: string;
           detail?: string;
@@ -109,8 +113,32 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ project });
   }
 
+  if (body.action === "createSnapshot") {
+    const project = await createProjectSnapshot(projectSlug, body.snapshotLabel);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
   if (body.action === "applyRepair") {
     const project = await applyProjectRepair(projectSlug);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "restoreSnapshot") {
+    if (!body.snapshotId) {
+      return NextResponse.json({ error: "Missing snapshot identifier." }, { status: 400 });
+    }
+
+    const project = await restoreProjectSnapshot(projectSlug, body.snapshotId);
 
     if (!project) {
       return NextResponse.json({ error: "Project not found." }, { status: 404 });

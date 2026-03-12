@@ -8,7 +8,7 @@ import {
   formatCitationToken,
   type SourceDraftInput,
 } from "@/lib/document-intelligence";
-import type { BuildSeverity, ProjectRecord, RepairOperation } from "@/lib/product-data";
+import type { BuildSeverity, ProjectRecord } from "@/lib/product-data";
 
 const modeOptions = ["Draft", "Research", "Review", "Submission"] as const;
 const utilityTabs = ["AI", "Sources", "Comments", "Trust", "History"] as const;
@@ -21,11 +21,14 @@ type LeftTab = (typeof leftTabs)[number];
 type WorkspaceShellProps = {
   isCompiling: boolean;
   isRepairing: boolean;
+  isVersioning: boolean;
   onApplyRepair: () => void;
   onCompile: () => void;
+  onCreateSnapshot: (snapshotLabel?: string) => void;
   onCreateFile: (fileName: string) => void;
   onCreateSource: (input: SourceDraftInput) => Promise<void> | void;
   onRollbackRepair: () => void;
+  onRestoreSnapshot: (snapshotId: string) => void;
   project: ProjectRecord;
   onSelectFile: (fileName: string) => void;
   onUpdateDocument: (fileName: string, content: string) => void;
@@ -52,9 +55,9 @@ const emptySourceDraft: SourceDraftState = {
   detail: "",
 };
 
-function buildDiffPreview(operation: RepairOperation) {
-  const beforeLines = operation.beforeContent.split("\n");
-  const afterLines = operation.afterContent.split("\n");
+function buildDiffPreview(beforeContent: string, afterContent: string) {
+  const beforeLines = beforeContent.split("\n");
+  const afterLines = afterContent.split("\n");
   let startIndex = 0;
 
   while (
@@ -90,11 +93,14 @@ function buildDiffPreview(operation: RepairOperation) {
 export function WorkspaceShell({
   isCompiling,
   isRepairing,
+  isVersioning,
   onApplyRepair,
   onCompile,
+  onCreateSnapshot,
   onCreateFile,
   onCreateSource,
   onRollbackRepair,
+  onRestoreSnapshot,
   project,
   onSelectFile,
   onUpdateDocument,
@@ -112,6 +118,7 @@ export function WorkspaceShell({
   const [showSourceComposer, setShowSourceComposer] = useState(false);
   const [showRepairDiff, setShowRepairDiff] = useState(false);
   const [showRepairExplanation, setShowRepairExplanation] = useState(false);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(workspace.versionSnapshots?.[0]?.id ?? null);
   const [citationInsertionRequest, setCitationInsertionRequest] = useState<{ id: string; text: string } | null>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const currentDocument =
@@ -121,6 +128,17 @@ export function WorkspaceShell({
   const canInsertCitation = canInsertCitationIntoFile(workspace.currentFile);
   const repairSuggestion = workspace.repairSuggestion ?? null;
   const hasRollbackSnapshot = Boolean(workspace.rollbackSnapshot);
+  const versionSnapshots = workspace.versionSnapshots ?? [];
+  const selectedSnapshot =
+    versionSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? versionSnapshots[0] ?? null;
+  const compareFileName = selectedSnapshot
+    ? selectedSnapshot.documents[workspace.currentFile]
+      ? workspace.currentFile
+      : selectedSnapshot.currentFile
+    : workspace.currentFile;
+  const snapshotCompare = selectedSnapshot
+    ? buildDiffPreview(selectedSnapshot.documents[compareFileName] ?? "", workspace.documents[compareFileName] ?? "")
+    : null;
   const filteredSearchHits = query
     ? [
         ...workspace.searchHits
@@ -156,6 +174,17 @@ export function WorkspaceShell({
     setShowRepairDiff(false);
     setShowRepairExplanation(false);
   }, [repairSuggestion?.id]);
+
+  useEffect(() => {
+    if (!selectedSnapshotId && versionSnapshots.length > 0) {
+      setSelectedSnapshotId(versionSnapshots[0]?.id ?? null);
+      return;
+    }
+
+    if (selectedSnapshotId && !versionSnapshots.some((snapshot) => snapshot.id === selectedSnapshotId)) {
+      setSelectedSnapshotId(versionSnapshots[0]?.id ?? null);
+    }
+  }, [selectedSnapshotId, versionSnapshots]);
 
   async function handleCreateSource() {
     if (!sourceDraft.title.trim() || !sourceDraft.detail.trim()) {
@@ -473,7 +502,7 @@ export function WorkspaceShell({
                     {showRepairDiff && (
                       <div className="repair-diff-list">
                         {repairSuggestion.operations.map((operation) => {
-                          const preview = buildDiffPreview(operation);
+                          const preview = buildDiffPreview(operation.beforeContent, operation.afterContent);
 
                           return (
                             <article key={`${repairSuggestion.id}-${operation.fileName}`} className="repair-diff-card">
@@ -698,6 +727,104 @@ export function WorkspaceShell({
 
             {utilityTab === "History" && (
               <div className="utility-content">
+                <div className="utility-section-header">
+                  <div>
+                    <p className="eyebrow">Snapshots</p>
+                    <h3>{versionSnapshots.length} saved revisions</h3>
+                  </div>
+                  <button
+                    className="ghost-button ghost-button--compact"
+                    disabled={isVersioning}
+                    onClick={() => {
+                      const label = window.prompt("Name this snapshot", `${project.title} checkpoint`);
+
+                      if (!label) {
+                        return;
+                      }
+
+                      onCreateSnapshot(label.trim());
+                    }}
+                    type="button"
+                  >
+                    {isVersioning ? "Saving..." : "Save snapshot"}
+                  </button>
+                </div>
+
+                {versionSnapshots.length > 0 ? (
+                  <div className="snapshot-stack">
+                    {versionSnapshots.map((snapshot) => (
+                      <button
+                        key={snapshot.id}
+                        className={snapshot.id === selectedSnapshot?.id ? "snapshot-card snapshot-card--active" : "snapshot-card"}
+                        onClick={() => setSelectedSnapshotId(snapshot.id)}
+                        type="button"
+                      >
+                        <strong>{snapshot.label}</strong>
+                        <span>{snapshot.createdAt}</span>
+                        <small>
+                          {Object.keys(snapshot.documents).length} files · {snapshot.currentFile}
+                        </small>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="utility-banner">No snapshots saved yet. Create a checkpoint before deeper revisions.</div>
+                )}
+
+                {selectedSnapshot && snapshotCompare && (
+                  <div className="history-compare-card">
+                    <div className="utility-section-header utility-section-header--compact">
+                      <div>
+                        <p className="eyebrow">Compare</p>
+                        <h3>{selectedSnapshot.label}</h3>
+                      </div>
+                      <div className="assistant-actions">
+                        <button
+                          className="ghost-button ghost-button--compact"
+                          onClick={() => {
+                            if (compareFileName !== workspace.currentFile) {
+                              onSelectFile(compareFileName);
+                            }
+                          }}
+                          type="button"
+                        >
+                          Open file
+                        </button>
+                        <button
+                          className="primary-button"
+                          disabled={isVersioning}
+                          onClick={() => onRestoreSnapshot(selectedSnapshot.id)}
+                          type="button"
+                        >
+                          {isVersioning ? "Restoring..." : "Restore snapshot"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="assistant-meta">
+                      <span>Comparing file: {compareFileName}</span>
+                      <span>Snapshot time: {selectedSnapshot.createdAt}</span>
+                    </div>
+
+                    <div className="repair-diff-grid">
+                      <div className="repair-diff-block repair-diff-block--before">
+                        <p>Snapshot</p>
+                        <pre>{snapshotCompare.before || "No content in this file at snapshot time."}</pre>
+                      </div>
+                      <div className="repair-diff-block repair-diff-block--after">
+                        <p>Current</p>
+                        <pre>{snapshotCompare.after || "No content in the current workspace file."}</pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="utility-section-header utility-section-header--compact">
+                  <div>
+                    <p className="eyebrow">Activity</p>
+                    <h3>Recent workspace events</h3>
+                  </div>
+                </div>
                 {workspace.history.map((event) => (
                   <article key={`${event.label}-${event.meta}`} className="history-card">
                     <strong>{event.label}</strong>

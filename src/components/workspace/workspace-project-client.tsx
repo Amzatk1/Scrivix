@@ -13,19 +13,23 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
     applyProjectRepair,
     compileProject,
     compilingProjectSlugs,
+    createProjectSnapshot,
     createProjectFile,
     createProjectSource,
     hydrated,
     projects,
     repairingProjectSlugs,
+    restoreProjectSnapshot,
     rollbackProjectRepair,
     selectProjectFile,
     syncError,
     updateProjectDocument,
+    versioningProjectSlugs,
   } = useScrivix();
   const project = projects.find((entry) => entry.slug === projectSlug);
   const isCompiling = compilingProjectSlugs.includes(projectSlug);
   const isRepairing = repairingProjectSlugs.includes(projectSlug);
+  const isVersioning = versioningProjectSlugs.includes(projectSlug);
 
   if (!project && !hydrated) {
     return (
@@ -84,11 +88,14 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
         <WorkspaceShell
           isCompiling={isCompiling}
           isRepairing={isRepairing}
+          isVersioning={isVersioning}
           onApplyRepair={() => applyProjectRepair(project.slug)}
           onCompile={() => compileProject(project.slug)}
+          onCreateSnapshot={(snapshotLabel) => createProjectSnapshot(project.slug, snapshotLabel)}
           onCreateFile={(fileName) => createProjectFile(project.slug, fileName)}
           onCreateSource={(input) => createProjectSource(project.slug, input)}
           onRollbackRepair={() => rollbackProjectRepair(project.slug)}
+          onRestoreSnapshot={(snapshotId) => restoreProjectSnapshot(project.slug, snapshotId)}
           onSelectFile={(fileName) => selectProjectFile(project.slug, fileName)}
           onUpdateDocument={(fileName, content) => updateProjectDocument(project.slug, fileName, content)}
           project={project}

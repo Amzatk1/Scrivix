@@ -45,6 +45,7 @@ This first pass focuses on the product shell rather than backend systems:
 - bottom build console
 - API-backed project store persisted to `data/projects.json`
 - compile action wired through a worker-backed build runner with `latexmk` detection and fallback analysis
+- snapshot save, compare, and restore workflows in the history pane
 - API-backed file creation from the workspace tree
 - API-backed imported project creation
 - branded landing and dashboard screens
@@ -54,4 +55,4 @@ This first pass focuses on the product shell rather than backend systems:
 1. Replace the filesystem-backed JSON store with a database-backed project model.
 2. Expand the hybrid editor into a fuller semantic block system with citations, tables, and figures.
 3. Expand the repair layer from deterministic patches into broader diff-reviewed agent workflows.
-4. Add deeper version history and compare workflows for serious review cycles.
+4. Add export profiles and submission preflight workflows on top of the new compile and versioning foundations.

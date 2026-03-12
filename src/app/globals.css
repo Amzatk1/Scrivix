@@ -1074,6 +1074,7 @@ h3 {
 .assistant-card,
 .comment-card,
 .history-card,
+.history-compare-card,
 .source-card,
 .trust-issue,
 .source-form-card {
@@ -1180,6 +1181,45 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.snapshot-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.snapshot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--scrivix-radius-md);
+  border: 1px solid var(--scrivix-border);
+  background: rgba(255, 255, 255, 0.78);
+  text-align: left;
+}
+
+.snapshot-card--active {
+  border-color: rgba(39, 91, 116, 0.32);
+  background: rgba(39, 91, 116, 0.08);
+  box-shadow: 0 0 0 3px rgba(39, 91, 116, 0.08);
+}
+
+.snapshot-card span,
+.snapshot-card small {
+  color: var(--scrivix-text-muted);
+}
+
+.history-compare-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--scrivix-border);
+  border-radius: var(--scrivix-radius-md);
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .source-card__header strong,
