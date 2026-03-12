@@ -29,16 +29,17 @@ This first pass focuses on the product shell rather than backend systems:
 - Overleaf-inspired workspace layout
 - typed project and template records
 - project browser and template gallery
-- starter project creation flow
+- starter project creation flow with local persistence
 - project navigation and outline panes
-- editor and preview split
+- editable document surface and derived preview
 - right-side utility tabs for AI, sources, comments, trust, and history
 - bottom build console
+- API-backed project store persisted to `data/projects.json`
 - branded landing and dashboard screens
 
 ## Next implementation priorities
 
-1. Replace static in-memory records with persisted project state and route-level loading.
+1. Replace the filesystem-backed JSON store with a database-backed project model.
 2. Add real editor primitives for rich text and LaTeX/Markdown modes.
-3. Implement project creation persistence, imports, and template instantiation.
+3. Implement import flows and template instantiation beyond seeded records.
 4. Build the compile pipeline and AI diff-review architecture.

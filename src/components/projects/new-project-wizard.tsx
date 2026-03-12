@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { projects, templates, type ProjectMode } from "@/lib/product-data";
+import { useRouter } from "next/navigation";
+import { startTransition, useState, useTransition } from "react";
+import { useScrivix } from "@/components/providers/scrivix-provider";
+import { templates, type ProjectMode } from "@/lib/product-data";
 
 type NewProjectWizardProps = {
   initialTemplateSlug?: string;
@@ -16,20 +18,42 @@ const modeOptions: Array<{ value: ProjectMode; label: string; description: strin
 ];
 
 export function NewProjectWizard({ initialTemplateSlug }: NewProjectWizardProps) {
+  const router = useRouter();
+  const { createProject, syncError } = useScrivix();
   const fallbackTemplate = templates[0];
   const initialTemplate =
     templates.find((template) => template.slug === initialTemplateSlug) ?? fallbackTemplate;
   const [selectedTemplateSlug, setSelectedTemplateSlug] = useState(initialTemplate.slug);
   const [selectedMode, setSelectedMode] = useState<ProjectMode>(initialTemplate.mode);
+  const [title, setTitle] = useState(`${initialTemplate.title} Workspace`);
+  const [subtitle, setSubtitle] = useState(initialTemplate.title);
+  const [audience, setAudience] = useState(initialTemplate.audience);
+  const [isPending, startCreating] = useTransition();
 
   const selectedTemplate =
     templates.find((template) => template.slug === selectedTemplateSlug) ?? fallbackTemplate;
-  const relatedProject =
-    projects.find((project) => project.templateSlug === selectedTemplate.slug) ?? projects[0];
+
+  function handleCreateProject() {
+    startCreating(() => {
+      void createProject({
+        title,
+        subtitle,
+        audience,
+        templateSlug: selectedTemplate.slug,
+        mode: selectedMode,
+        summary: selectedTemplate.description,
+      }).then((project) => {
+        startTransition(() => {
+          router.push(`/workspace/${project.slug}`);
+        });
+      });
+    });
+  }
 
   return (
     <div className="wizard-layout">
       <section className="wizard-panel panel">
+        {syncError && <div className="sync-banner sync-banner--compact panel">{syncError}</div>}
         <div className="wizard-step">
           <div className="wizard-step__header">
             <span className="wizard-step__number">1</span>
@@ -47,6 +71,9 @@ export function NewProjectWizard({ initialTemplateSlug }: NewProjectWizardProps)
                 onClick={() => {
                   setSelectedTemplateSlug(template.slug);
                   setSelectedMode(template.mode);
+                  setTitle(`${template.title} Workspace`);
+                  setSubtitle(template.title);
+                  setAudience(template.audience);
                 }}
                 type="button"
               >
@@ -60,7 +87,34 @@ export function NewProjectWizard({ initialTemplateSlug }: NewProjectWizardProps)
 
         <div className="wizard-step">
           <div className="wizard-step__header">
-            <span className="wizard-step__number">2</span>
+            <span className="wizard-step__number">3</span>
+            <div>
+              <h2>Name the workspace</h2>
+              <p>Set the document identity that will appear across the dashboard, project browser, and workspace.</p>
+            </div>
+          </div>
+
+          <div className="wizard-form-grid">
+            <label className="wizard-field">
+              <span>Project title</span>
+              <input onChange={(event) => setTitle(event.target.value)} value={title} />
+            </label>
+
+            <label className="wizard-field">
+              <span>Subtitle / template label</span>
+              <input onChange={(event) => setSubtitle(event.target.value)} value={subtitle} />
+            </label>
+
+            <label className="wizard-field wizard-field--full">
+              <span>Audience</span>
+              <input onChange={(event) => setAudience(event.target.value)} value={audience} />
+            </label>
+          </div>
+        </div>
+
+        <div className="wizard-step">
+          <div className="wizard-step__header">
+            <span className="wizard-step__number">4</span>
             <div>
               <h2>Choose an authoring mode</h2>
               <p>Keep full control over how structured or syntax-heavy the writing experience should be.</p>
@@ -116,17 +170,26 @@ export function NewProjectWizard({ initialTemplateSlug }: NewProjectWizardProps)
         </div>
 
         <div className="wizard-summary__actions">
-          <Link className="primary-button" href={`/workspace/${relatedProject.slug}`}>
-            Open sample workspace
+          <button className="primary-button" disabled={isPending} onClick={handleCreateProject} type="button">
+            {isPending ? "Creating..." : "Create project"}
+          </button>
+          <Link className="ghost-button" href={`/projects/new?template=${selectedTemplate.slug}`}>
+            Refresh selection
           </Link>
           <Link className="ghost-button" href="/templates">
             Compare templates
           </Link>
         </div>
 
+        <div className="wizard-summary__actions">
+          <Link className="ghost-button" href="/projects">
+            View existing projects
+          </Link>
+        </div>
+
         <div className="wizard-summary__footnote">
-          This is still a static product foundation. The next backend pass will turn this into a real project creation
-          flow with persistent workspaces.
+          Project creation now persists locally in the browser so you can create a workspace, open it, and continue
+          editing without losing the draft state between reloads.
         </div>
       </aside>
     </div>

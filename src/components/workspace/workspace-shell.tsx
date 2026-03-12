@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import type { ProjectRecord } from "@/lib/product-data";
 
 const modeOptions = ["Draft", "Research", "Review", "Submission"] as const;
@@ -13,9 +13,36 @@ type LeftTab = (typeof leftTabs)[number];
 
 type WorkspaceShellProps = {
   project: ProjectRecord;
+  onSelectFile: (fileName: string) => void;
+  onUpdateDocument: (fileName: string, content: string) => void;
 };
 
-export function WorkspaceShell({ project }: WorkspaceShellProps) {
+function derivePreviewParagraphs(document: string, fallbackTitle: string) {
+  const trimmed = document.trim();
+
+  if (!trimmed) {
+    return [fallbackTitle, "Start drafting in this document to see a live preview summary here."];
+  }
+
+  const latexMatch = trimmed.match(/\\section\{([^}]+)\}/);
+  const markdownMatch = trimmed.match(/^#{1,3}\s+(.+)$/m);
+  const title = latexMatch?.[1] ?? markdownMatch?.[1] ?? fallbackTitle;
+  const cleaned = trimmed
+    .replace(/\\section\{[^}]+\}/g, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\\subsection\{([^}]+)\}/g, "$1")
+    .replace(/[`*_\\]/g, "")
+    .trim();
+  const bodyParagraphs = cleaned
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 2);
+
+  return [title, ...bodyParagraphs];
+}
+
+export function WorkspaceShell({ project, onSelectFile, onUpdateDocument }: WorkspaceShellProps) {
   const workspace = project.workspace;
   const [mode, setMode] = useState<Mode>(workspace.defaultMode);
   const [utilityTab, setUtilityTab] = useState<UtilityTab>("AI");
@@ -23,6 +50,25 @@ export function WorkspaceShell({ project }: WorkspaceShellProps) {
   const [showPreview, setShowPreview] = useState(true);
   const [showUtility, setShowUtility] = useState(true);
   const [showConsole, setShowConsole] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const currentDocument =
+    workspace.documents[workspace.currentFile] ?? `Start drafting in ${workspace.currentFile}.`;
+  const previewParagraphs = derivePreviewParagraphs(currentDocument, workspace.currentFile);
+  const query = deferredSearchQuery.trim().toLowerCase();
+  const filteredSearchHits = query
+    ? [
+        ...workspace.searchHits
+          .filter((hit) => `${hit.term} ${hit.summary}`.toLowerCase().includes(query))
+          .map((hit) => ({ title: hit.term, summary: hit.summary, kind: "Project hit" })),
+        ...workspace.files
+          .filter((file) => file.type !== "folder" && file.name.toLowerCase().includes(query))
+          .map((file) => ({ title: file.name, summary: "File match", kind: "File" })),
+        ...workspace.outline
+          .filter((section) => `${section.title} ${section.note}`.toLowerCase().includes(query))
+          .map((section) => ({ title: section.title, summary: section.note, kind: "Outline" })),
+      ].slice(0, 6)
+    : workspace.searchHits.map((hit) => ({ title: hit.term, summary: hit.summary, kind: "Recent hit" }));
 
   return (
     <div className="workspace-shell">
@@ -102,8 +148,18 @@ export function WorkspaceShell({ project }: WorkspaceShellProps) {
               <ul className="tree-list">
                 {workspace.files.map((file) => (
                   <li key={file.name} className={file.active ? "tree-item tree-item--active" : "tree-item"}>
-                    <span className={`tree-badge tree-badge--${file.type}`}>{file.type.slice(0, 1).toUpperCase()}</span>
-                    <span>{file.name}</span>
+                    <button
+                      className={file.type === "folder" ? "tree-button tree-button--static" : "tree-button"}
+                      onClick={() => {
+                        if (file.type !== "folder") {
+                          onSelectFile(file.name);
+                        }
+                      }}
+                      type="button"
+                    >
+                      <span className={`tree-badge tree-badge--${file.type}`}>{file.type.slice(0, 1).toUpperCase()}</span>
+                      <span>{file.name}</span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -131,12 +187,17 @@ export function WorkspaceShell({ project }: WorkspaceShellProps) {
             <div className="sidebar-content">
               <div className="search-card">
                 <label htmlFor="project-search">Search project</label>
-                <input id="project-search" placeholder="Find files, comments, sources..." />
+                <input
+                  id="project-search"
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Find files, comments, sources..."
+                  value={searchQuery}
+                />
               </div>
-              {workspace.searchHits.map((hit) => (
-                <div key={hit.term} className="search-result-card">
-                  <p>Recent hit</p>
-                  <strong>{hit.term}</strong>
+              {filteredSearchHits.map((hit) => (
+                <div key={`${hit.kind}-${hit.title}`} className="search-result-card">
+                  <p>{hit.kind}</p>
+                  <strong>{hit.title}</strong>
                   <span>{hit.summary}</span>
                 </div>
               ))}
@@ -154,6 +215,7 @@ export function WorkspaceShell({ project }: WorkspaceShellProps) {
               <span>Mode: {mode}</span>
               <span>Word estimate: {workspace.wordEstimate}</span>
               <span>Last export: {workspace.lastExport}</span>
+              <span>State: {project.meta}</span>
             </div>
           </div>
 
@@ -167,7 +229,12 @@ export function WorkspaceShell({ project }: WorkspaceShellProps) {
                 ))}
               </div>
 
-              <pre className="editor-surface">{workspace.editorSample}</pre>
+              <textarea
+                aria-label={`Editor for ${workspace.currentFile}`}
+                className="editor-surface editor-surface--editable"
+                onChange={(event) => onUpdateDocument(workspace.currentFile, event.target.value)}
+                value={currentDocument}
+              />
 
               <div className="editor-footer">
                 <button className="ghost-button" type="button">
@@ -190,7 +257,7 @@ export function WorkspaceShell({ project }: WorkspaceShellProps) {
                 </div>
 
                 <div className="page-preview">
-                  {workspace.previewParagraphs.map((paragraph, index) => (
+                  {previewParagraphs.map((paragraph, index) => (
                     <p key={`${paragraph}-${index}`} className={index === 0 ? "page-preview__title" : ""}>
                       {paragraph}
                     </p>

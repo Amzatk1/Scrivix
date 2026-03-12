@@ -112,6 +112,13 @@ button {
   border-color: transparent;
 }
 
+.primary-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .ghost-button:hover,
 .primary-button:hover,
 .toggle-chip:hover,
@@ -124,7 +131,8 @@ button {
 
 .marketing-page,
 .dashboard-page,
-.workspace-page {
+.workspace-page,
+.directory-page {
   min-height: 100vh;
 }
 
@@ -447,6 +455,20 @@ button {
   padding: 2rem 1.25rem 3rem;
 }
 
+.sync-banner {
+  width: min(calc(100% - 2rem), var(--max-width));
+  margin: 0 auto 1rem;
+  padding: 0.9rem 1rem;
+  color: var(--warn);
+  background: rgba(255, 248, 238, 0.94);
+  border-color: rgba(143, 95, 32, 0.16);
+}
+
+.sync-banner--compact {
+  width: 100%;
+  margin: 0 0 1rem;
+}
+
 .dashboard-header {
   display: flex;
   align-items: flex-end;
@@ -706,6 +728,22 @@ button {
   color: var(--accent);
 }
 
+.tree-button {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.tree-button--static {
+  cursor: default;
+}
+
 .tree-badge {
   display: inline-flex;
   align-items: center;
@@ -812,6 +850,11 @@ button {
   font-size: 0.94rem;
   line-height: 1.75;
   color: #24303a;
+}
+
+.editor-surface--editable {
+  width: 100%;
+  resize: vertical;
 }
 
 .editor-footer {
@@ -944,7 +987,6 @@ button {
 }
 
 .directory-page {
-  min-height: 100vh;
   padding: 2rem 1.25rem 3rem;
 }
 
@@ -958,6 +1000,15 @@ button {
 .directory-actions {
   align-items: center;
   flex-wrap: wrap;
+}
+
+.directory-search input,
+.wizard-field input {
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(29, 39, 49, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+  min-width: 16rem;
 }
 
 .project-browser-grid,
@@ -1050,7 +1101,8 @@ button {
 }
 
 .wizard-template-grid,
-.wizard-mode-grid {
+.wizard-mode-grid,
+.wizard-form-grid {
   display: grid;
   gap: 0.75rem;
 }
@@ -1061,6 +1113,20 @@ button {
 
 .wizard-mode-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wizard-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wizard-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.wizard-field--full {
+  grid-column: 1 / -1;
 }
 
 .wizard-option {
@@ -1113,6 +1179,22 @@ button {
   line-height: 1.55;
 }
 
+.empty-state-panel {
+  padding: 1.35rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 1180px) {
   .hero,
   .dashboard-header,
@@ -1145,7 +1227,8 @@ button {
   .template-gallery-grid,
   .wizard-layout,
   .wizard-template-grid,
-  .wizard-mode-grid {
+  .wizard-mode-grid,
+  .wizard-form-grid {
     grid-template-columns: 1fr;
   }
 }

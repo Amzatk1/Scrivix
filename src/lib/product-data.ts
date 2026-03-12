@@ -75,6 +75,7 @@ export type SearchHit = {
 export type WorkspaceRecord = {
   defaultMode: WorkspaceMode;
   currentFile: string;
+  documents: Record<string, string>;
   wordEstimate: string;
   lastExport: string;
   compileStatus: string;
@@ -208,6 +209,42 @@ export const projects: ProjectRecord[] = [
     workspace: {
       defaultMode: "Research",
       currentFile: "chapter-03-methodology.tex",
+      documents: {
+        "main.tex": `\\documentclass{report}
+\\begin{document}
+\\input{chapters/chapter-03-methodology}
+\\end{document}`,
+        "chapter-03-methodology.tex": `\\section{Methodology}
+
+This chapter explains the research design, data collection strategy, and
+analysis workflow used to evaluate institutional adoption of AI-native writing
+systems. The aim is to justify the methodological choices in a way that is
+transparent, reproducible, and aligned with the dissertation rubric.
+
+The project uses a mixed-methods design. First, the study maps the workflow
+friction experienced by postgraduate writers across planning, drafting,
+citation management, and final submission. Second, it evaluates how an
+integrated workspace changes that experience when compared with fragmented tool
+chains built around word processors, note systems, and general-purpose AI
+assistants.
+
+\\subsection{Research design}
+
+The research design combines interview data, workflow diaries, and analysis of
+document artefacts produced during the study. This allows the project to assess
+both perceived usability and observable writing outcomes.`,
+        "references.bib": `@article{crawford2024methods,
+  title = {Benchmarking Methods for AI Writing Workflows},
+  author = {Crawford, Elena and Shah, Ravi},
+  year = {2024},
+  journal = {Journal of Research Methods}
+}`,
+        "submission-checklist.md": `# Submission Checklist
+
+- [ ] Final methodology citations confirmed
+- [ ] Supervisor review pack exported
+- [ ] PDF passes institutional template check`,
+      },
       wordEstimate: "2,814",
       lastExport: "09:32",
       compileStatus: "Build warnings",
@@ -336,6 +373,28 @@ both perceived usability and observable writing outcomes.`,
     workspace: {
       defaultMode: "Review",
       currentFile: "sections/recommendations.svx",
+      documents: {
+        "brief.svx": `# Executive Summary
+
+This brief recommends a staged governance model for institutional adoption of
+AI-native writing systems.`,
+        "sections/recommendations.svx": `## Recommendations
+
+The department should adopt a staged governance model for AI-enabled writing
+systems. In the first ninety days, procurement and assurance teams should
+define a minimum evidence standard for any system used in high-stakes drafting.
+
+The operating model should require three controls. First, every generated claim
+used in policy drafting must be linked to a verifiable source or marked for
+review. Second, document review workflows should preserve revision provenance.
+Third, export profiles should ensure that the final briefing pack remains
+consistent across internal and external circulation.`,
+        "export-profile.yml": `profile: board-brief
+outputs:
+  - pdf
+  - docx
+tone: formal`,
+      },
       wordEstimate: "1,940",
       lastExport: "Yesterday, 18:04",
       compileStatus: "Needs evidence",
@@ -450,6 +509,26 @@ consistent across internal and external circulation.`,
     workspace: {
       defaultMode: "Draft",
       currentFile: "appendix/system-architecture.md",
+      documents: {
+        "narrative.md": `# Why this market now
+
+Serious documents still move through fragmented tools that separate drafting,
+review, source grounding, and final export.`,
+        "appendix/system-architecture.md": `## Architecture
+
+Scrivix is built as a modular document system rather than a general-purpose
+editor with AI bolted on. The product keeps document state, source state, build
+state, and review state in one workspace so users do not need to reconstruct
+context across tools.
+
+This matters because the moat is not just model access. It is the combination
+of structured document workflows, safe diff application, evidence grounding, and
+submission readiness in one product shell.`,
+        "market-evidence.md": `## Evidence
+
+- 24 user interviews across postgraduate and policy-writing workflows
+- repeated pain around citations, formatting, and final submission`,
+      },
       wordEstimate: "1,220",
       lastExport: "Today, 07:54",
       compileStatus: "Review pending",
@@ -542,4 +621,3 @@ export function getTemplateBySlug(slug: string): TemplateRecord | undefined {
 export function getProjectBySlug(slug: string): ProjectRecord | undefined {
   return projects.find((project) => project.slug === slug);
 }
-
