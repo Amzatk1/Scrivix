@@ -4,9 +4,12 @@ import {
   createProjectSnapshot,
   createProjectFile,
   createProjectSource,
+  generateProjectExportArtifact,
   getProject,
   rollbackProjectRepair,
+  runProjectSubmissionPreflight,
   restoreProjectSnapshot,
+  selectProjectExportProfile,
   selectProjectFile,
   updateProjectDocument,
 } from "@/lib/server/project-store";
@@ -35,6 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         action?: string;
         fileName?: string;
         content?: string;
+        exportProfileId?: string;
         snapshotId?: string;
         snapshotLabel?: string;
         source?: {
@@ -123,8 +127,42 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ project });
   }
 
+  if (body.action === "selectExportProfile") {
+    if (!body.exportProfileId) {
+      return NextResponse.json({ error: "Missing export profile identifier." }, { status: 400 });
+    }
+
+    const project = await selectProjectExportProfile(projectSlug, body.exportProfileId);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "generateExportArtifact") {
+    const result = await generateProjectExportArtifact(projectSlug);
+
+    if (!result.project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project: result.project });
+  }
+
   if (body.action === "applyRepair") {
     const project = await applyProjectRepair(projectSlug);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "runSubmissionPreflight") {
+    const project = await runProjectSubmissionPreflight(projectSlug);
 
     if (!project) {
       return NextResponse.json({ error: "Project not found." }, { status: 404 });

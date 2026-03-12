@@ -508,7 +508,9 @@ h3 {
 .wizard-summary__body,
 .comment-card p,
 .assistant-card p,
+.history-card p,
 .history-card span,
+.history-card small,
 .source-card span,
 .source-card small,
 .preview-callout span {
@@ -1220,6 +1222,16 @@ h3 {
   border: 1px solid var(--scrivix-border);
   border-radius: var(--scrivix-radius-md);
   background: rgba(255, 255, 255, 0.84);
+}
+
+.history-card--artifact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-card--artifact p {
+  margin: 0;
 }
 
 .source-card__header strong,

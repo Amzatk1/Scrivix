@@ -8,10 +8,10 @@ import {
   formatCitationToken,
   type SourceDraftInput,
 } from "@/lib/document-intelligence";
-import type { BuildSeverity, ProjectRecord } from "@/lib/product-data";
+import type { BuildSeverity, ProjectRecord, SubmissionCheck } from "@/lib/product-data";
 
 const modeOptions = ["Draft", "Research", "Review", "Submission"] as const;
-const utilityTabs = ["AI", "Sources", "Comments", "Trust", "History"] as const;
+const utilityTabs = ["AI", "Sources", "Comments", "Trust", "History", "Submission"] as const;
 const leftTabs = ["Files", "Outline", "Search"] as const;
 
 type Mode = (typeof modeOptions)[number];
@@ -20,15 +20,20 @@ type LeftTab = (typeof leftTabs)[number];
 
 type WorkspaceShellProps = {
   isCompiling: boolean;
+  isExporting: boolean;
   isRepairing: boolean;
+  isSubmitting: boolean;
   isVersioning: boolean;
   onApplyRepair: () => void;
   onCompile: () => void;
   onCreateSnapshot: (snapshotLabel?: string) => void;
   onCreateFile: (fileName: string) => void;
   onCreateSource: (input: SourceDraftInput) => Promise<void> | void;
+  onGenerateExportArtifact: () => void;
   onRollbackRepair: () => void;
+  onRunSubmissionPreflight: () => void;
   onRestoreSnapshot: (snapshotId: string) => void;
+  onSelectExportProfile: (profileId: string) => void;
   project: ProjectRecord;
   onSelectFile: (fileName: string) => void;
   onUpdateDocument: (fileName: string, content: string) => void;
@@ -92,15 +97,20 @@ function buildDiffPreview(beforeContent: string, afterContent: string) {
 
 export function WorkspaceShell({
   isCompiling,
+  isExporting,
   isRepairing,
+  isSubmitting,
   isVersioning,
   onApplyRepair,
   onCompile,
   onCreateSnapshot,
   onCreateFile,
   onCreateSource,
+  onGenerateExportArtifact,
   onRollbackRepair,
+  onRunSubmissionPreflight,
   onRestoreSnapshot,
+  onSelectExportProfile,
   project,
   onSelectFile,
   onUpdateDocument,
@@ -128,6 +138,11 @@ export function WorkspaceShell({
   const canInsertCitation = canInsertCitationIntoFile(workspace.currentFile);
   const repairSuggestion = workspace.repairSuggestion ?? null;
   const hasRollbackSnapshot = Boolean(workspace.rollbackSnapshot);
+  const exportProfiles = workspace.exportProfiles ?? [];
+  const exportArtifacts = workspace.exportArtifacts ?? [];
+  const activeExportProfile = workspace.activeExportProfile ?? exportProfiles[0]?.id ?? null;
+  const activeProfileRecord = exportProfiles.find((profile) => profile.id === activeExportProfile) ?? exportProfiles[0] ?? null;
+  const submissionChecks = workspace.submissionChecks ?? [];
   const versionSnapshots = workspace.versionSnapshots ?? [];
   const selectedSnapshot =
     versionSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? versionSnapshots[0] ?? null;
@@ -176,6 +191,13 @@ export function WorkspaceShell({
   }, [repairSuggestion?.id]);
 
   useEffect(() => {
+    if (mode === "Submission") {
+      setShowUtility(true);
+      setUtilityTab("Submission");
+    }
+  }, [mode]);
+
+  useEffect(() => {
     if (!selectedSnapshotId && versionSnapshots.length > 0) {
       setSelectedSnapshotId(versionSnapshots[0]?.id ?? null);
       return;
@@ -218,6 +240,16 @@ export function WorkspaceShell({
     setLeftTab("Files");
   }
 
+  function jumpToSubmissionCheck(check: SubmissionCheck) {
+    if (check.location) {
+      jumpToIssue(check.location);
+      return;
+    }
+
+    setUtilityTab("Submission");
+    setShowUtility(true);
+  }
+
   return (
     <div className="workspace-shell">
       <div className="workspace-topbar">
@@ -231,8 +263,16 @@ export function WorkspaceShell({
 
         <div className="workspace-actions">
           <div className={`status-pill status-pill--${project.statusTone}`}>{workspace.compileStatus}</div>
-          <button className="ghost-button" type="button">
-            Export PDF
+          <button
+            className="ghost-button"
+            onClick={() => {
+              setMode("Submission");
+              setShowUtility(true);
+              setUtilityTab("Submission");
+            }}
+            type="button"
+          >
+            {activeProfileRecord ? activeProfileRecord.label : "Export"}
           </button>
           <button className="ghost-button" type="button">
             Share
@@ -413,6 +453,17 @@ export function WorkspaceShell({
                 </button>
                 <button className="ghost-button" onClick={() => setUtilityTab("Sources")} type="button">
                   Open source library
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    setMode("Submission");
+                    setShowUtility(true);
+                    setUtilityTab("Submission");
+                  }}
+                  type="button"
+                >
+                  Open submission preflight
                 </button>
               </div>
             </article>
@@ -833,6 +884,116 @@ export function WorkspaceShell({
                 ))}
               </div>
             )}
+
+            {utilityTab === "Submission" && (
+              <div className="utility-content">
+                <div className="assistant-card assistant-card--primary">
+                  <p className="eyebrow">Submission readiness</p>
+                  <h3>{workspace.submissionStatus ?? "Needs review before export"}</h3>
+                  <p>
+                    {activeProfileRecord
+                      ? `${activeProfileRecord.label} is selected as the current export target. ${activeProfileRecord.description}`
+                      : "Choose an export profile before running a final preflight."}
+                  </p>
+                  <div className="assistant-meta">
+                    <span>Last preflight: {workspace.lastPreflight ?? "Not run yet"}</span>
+                    <span>Last export state: {workspace.lastExport}</span>
+                  </div>
+                  <div className="assistant-actions">
+                    <button className="primary-button" disabled={isSubmitting} onClick={onRunSubmissionPreflight} type="button">
+                      {isSubmitting ? "Running..." : "Run preflight"}
+                    </button>
+                    <button className="ghost-button" disabled={isExporting} onClick={onGenerateExportArtifact} type="button">
+                      {isExporting ? "Generating..." : "Generate package"}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={isVersioning}
+                      onClick={() => onCreateSnapshot(`${project.title} submission checkpoint`)}
+                      type="button"
+                    >
+                      {isVersioning ? "Saving..." : "Save submission snapshot"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="utility-section-header utility-section-header--compact">
+                  <div>
+                    <p className="eyebrow">Export profiles</p>
+                    <h3>{exportProfiles.length} available outputs</h3>
+                  </div>
+                </div>
+                <div className="snapshot-stack">
+                  {exportProfiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      className={profile.id === activeExportProfile ? "snapshot-card snapshot-card--active" : "snapshot-card"}
+                      onClick={() => onSelectExportProfile(profile.id)}
+                      type="button"
+                    >
+                      <strong>{profile.label}</strong>
+                      <span>{profile.format.toUpperCase()}</span>
+                      <small>{profile.description}</small>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="utility-section-header utility-section-header--compact">
+                  <div>
+                    <p className="eyebrow">Preflight checks</p>
+                    <h3>{submissionChecks.length} checks evaluated</h3>
+                  </div>
+                </div>
+                <div className="trust-list">
+                  {submissionChecks.map((check) => (
+                    <article key={check.id} className={`trust-issue trust-issue--${check.tone}`}>
+                      <div>
+                        <strong>{check.label}</strong>
+                        <p>{check.detail}</p>
+                        <small>Status: {check.status}</small>
+                      </div>
+                      <button className="ghost-button ghost-button--compact" onClick={() => jumpToSubmissionCheck(check)} type="button">
+                        {check.location ? "Open file" : "View"}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="utility-section-header utility-section-header--compact">
+                  <div>
+                    <p className="eyebrow">Generated artifacts</p>
+                    <h3>{exportArtifacts.length} downloadable packages</h3>
+                  </div>
+                </div>
+                {exportArtifacts.length > 0 ? (
+                  <div className="snapshot-stack">
+                    {exportArtifacts.map((artifact) => (
+                      <article key={artifact.id} className="history-card history-card--artifact">
+                        <strong>{artifact.profileLabel}</strong>
+                        <span>
+                          {artifact.outputFormat.toUpperCase()} package · {artifact.sizeLabel}
+                        </span>
+                        <small>
+                          Target: {artifact.targetFormat.toUpperCase()} · {artifact.createdAt}
+                        </small>
+                        <p>{artifact.summary}</p>
+                        <div className="assistant-actions">
+                          <a
+                            className="ghost-button ghost-button--compact"
+                            download={artifact.fileName}
+                            href={`/api/projects/${project.slug}/exports/${artifact.id}`}
+                          >
+                            Download
+                          </a>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="utility-banner">No export packages generated yet. Run preflight, then create a package for download.</div>
+                )}
+              </div>
+            )}
           </aside>
         )}
       </div>
@@ -856,6 +1017,19 @@ export function WorkspaceShell({
                   type="button"
                 >
                   Review suggested repair
+                </button>
+              )}
+              {submissionChecks.some((check) => check.status !== "ready") && (
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    setMode("Submission");
+                    setShowUtility(true);
+                    setUtilityTab("Submission");
+                  }}
+                  type="button"
+                >
+                  Review preflight
                 </button>
               )}
               <button

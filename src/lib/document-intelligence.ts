@@ -1,6 +1,12 @@
 import type { BuildMessage, EvidenceIssue, ProjectMode, ProjectRecord, SourceCard, TrustSignal } from "@/lib/product-data";
 import { isLikelyHtml, sanitizePreviewHtml } from "@/lib/editor-utils";
 import { deriveRepairSuggestion } from "@/lib/repair-assistant";
+import {
+  deriveActiveExportProfile,
+  deriveExportProfiles,
+  deriveSubmissionChecks,
+  deriveSubmissionStatus,
+} from "@/lib/submission-utils";
 import { ensureVersionSnapshots } from "@/lib/version-utils";
 
 export type SourceDraftInput = {
@@ -313,12 +319,32 @@ export function applyWorkspaceIntelligence(project: ProjectRecord) {
       tone: unresolvedCitationKeys.length === 0 ? "good" : "warn",
     },
   ];
+  const versionSnapshots = ensureVersionSnapshots(project.workspace);
+  const exportProfiles = deriveExportProfiles(project);
+  const activeExportProfile = deriveActiveExportProfile(project, exportProfiles);
+  const submissionChecks = deriveSubmissionChecks(
+    {
+      ...project,
+      workspace: {
+        ...project.workspace,
+        versionSnapshots,
+      },
+    },
+    activeExportProfile,
+  );
+  const submissionStatus = deriveSubmissionStatus(submissionChecks);
 
   const nextWorkspace = {
     ...project.workspace,
     wordEstimate: calculateWordEstimate(project),
     sources,
-    versionSnapshots: ensureVersionSnapshots(project.workspace),
+    exportProfiles,
+    activeExportProfile,
+    exportArtifacts: project.workspace.exportArtifacts ?? [],
+    submissionChecks,
+    submissionStatus,
+    lastPreflight: project.workspace.lastPreflight ?? null,
+    versionSnapshots,
     trustSignals,
     evidenceIssues,
     buildMessages: project.workspace.buildMessages ?? ([] as BuildMessage[]),

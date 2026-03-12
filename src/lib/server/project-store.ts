@@ -12,6 +12,7 @@ import {
   type SourceDraftInput,
 } from "@/lib/document-intelligence";
 import { runProjectCompileWorker, type CompileResult } from "@/lib/server/compile-runner";
+import { generateProjectArtifactFile } from "@/lib/server/export-runner";
 import {
   buildProjectFromTemplate,
   buildImportedProject,
@@ -24,10 +25,12 @@ import { buildVersionSnapshot } from "@/lib/version-utils";
 import { createFileRecord } from "@/lib/editor-utils";
 
 const dataDirectory = path.join(process.cwd(), "data");
+const exportDirectory = path.join(dataDirectory, "exports");
 const storePath = path.join(dataDirectory, "projects.json");
 
 async function ensureStoreFile() {
   await mkdir(dataDirectory, { recursive: true });
+  await mkdir(exportDirectory, { recursive: true });
 
   try {
     await readFile(storePath, "utf8");
@@ -63,6 +66,10 @@ async function readProjectsFromDisk() {
 async function writeProjectsToDisk(projects: ProjectRecord[]) {
   await ensureStoreFile();
   await writeFile(storePath, JSON.stringify(projects, null, 2), "utf8");
+}
+
+function exportTimestamp() {
+  return `Today, ${compileTimestamp()}`;
 }
 
 function compileTimestamp() {
@@ -418,6 +425,92 @@ export async function createProjectSnapshot(projectSlug: string, label?: string)
   return nextProjects.find((project) => project.slug === projectSlug);
 }
 
+export async function selectProjectExportProfile(projectSlug: string, profileId: string) {
+  const projects = await readProjectsFromDisk();
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    return applyWorkspaceIntelligence({
+      ...project,
+      meta: "Export profile selected",
+      workspace: {
+        ...project.workspace,
+        activeExportProfile: profileId,
+        history: [
+          {
+            label: "Export profile selected",
+            meta: profileId,
+          },
+          ...project.workspace.history.slice(0, 4),
+        ],
+      },
+    });
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function generateProjectExportArtifact(projectSlug: string) {
+  const projects = await readProjectsFromDisk();
+  const timestamp = exportTimestamp();
+  let generatedArtifactPath: string | null = null;
+
+  const nextProjects = await Promise.all(
+    projects.map(async (project) => {
+      if (project.slug !== projectSlug) {
+        return project;
+      }
+
+      const analyzedProject = applyWorkspaceIntelligence(project);
+      const activeProfile =
+        analyzedProject.workspace.exportProfiles?.find(
+          (profile) => profile.id === analyzedProject.workspace.activeExportProfile,
+        ) ?? analyzedProject.workspace.exportProfiles?.[0];
+
+      if (!activeProfile) {
+        return {
+          ...analyzedProject,
+          meta: "No export profile available",
+        };
+      }
+
+      const artifact = await generateProjectArtifactFile({
+        exportDirectory,
+        profile: activeProfile,
+        project: analyzedProject,
+        timestamp,
+      });
+      generatedArtifactPath = path.join(exportDirectory, artifact.downloadPath);
+
+      return applyWorkspaceIntelligence({
+        ...analyzedProject,
+        meta: "Export package generated",
+        workspace: {
+          ...analyzedProject.workspace,
+          lastExport: timestamp,
+          exportArtifacts: [artifact, ...(analyzedProject.workspace.exportArtifacts ?? []).slice(0, 7)],
+          history: [
+            {
+              label: "Export package generated",
+              meta: activeProfile.label,
+            },
+            ...analyzedProject.workspace.history.slice(0, 4),
+          ],
+        },
+      });
+    }),
+  );
+
+  await writeProjectsToDisk(nextProjects);
+  return {
+    project: nextProjects.find((project) => project.slug === projectSlug),
+    generatedArtifactPath,
+  };
+}
+
 export async function compileProject(projectSlug: string) {
   const projects = await readProjectsFromDisk();
   const timestamp = compileTimestamp();
@@ -595,4 +688,61 @@ export async function restoreProjectSnapshot(projectSlug: string, snapshotId: st
 
   await writeProjectsToDisk(nextProjects);
   return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function runProjectSubmissionPreflight(projectSlug: string) {
+  const projects = await readProjectsFromDisk();
+  const timestamp = `Today, ${compileTimestamp()}`;
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    const analyzedProject = applyWorkspaceIntelligence(project);
+
+    return applyWorkspaceIntelligence({
+      ...analyzedProject,
+      meta: "Submission preflight complete",
+      status: analyzedProject.workspace.submissionStatus ?? analyzedProject.status,
+      statusTone:
+        analyzedProject.workspace.submissionStatus === "Blocked for export"
+          ? "warn"
+          : analyzedProject.workspace.submissionStatus === "Needs review before export"
+            ? "neutral"
+            : analyzedProject.statusTone,
+      workspace: {
+        ...analyzedProject.workspace,
+        lastPreflight: timestamp,
+        history: [
+          {
+            label: "Submission preflight",
+            meta: timestamp,
+          },
+          ...analyzedProject.workspace.history.slice(0, 4),
+        ],
+      },
+    });
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function getProjectExportArtifact(projectSlug: string, artifactId: string) {
+  const project = await getProject(projectSlug);
+
+  if (!project) {
+    return null;
+  }
+
+  const artifact = project.workspace.exportArtifacts?.find((entry) => entry.id === artifactId);
+
+  if (!artifact) {
+    return null;
+  }
+
+  return {
+    artifact,
+    absolutePath: path.join(exportDirectory, artifact.downloadPath),
+  };
 }

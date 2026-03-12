@@ -16,19 +16,26 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
     createProjectSnapshot,
     createProjectFile,
     createProjectSource,
+    exportingProjectSlugs,
+    generateProjectExportArtifact,
     hydrated,
     projects,
     repairingProjectSlugs,
+    runProjectSubmissionPreflight,
     restoreProjectSnapshot,
     rollbackProjectRepair,
     selectProjectFile,
+    selectProjectExportProfile,
+    submittingProjectSlugs,
     syncError,
     updateProjectDocument,
     versioningProjectSlugs,
   } = useScrivix();
   const project = projects.find((entry) => entry.slug === projectSlug);
   const isCompiling = compilingProjectSlugs.includes(projectSlug);
+  const isExporting = exportingProjectSlugs.includes(projectSlug);
   const isRepairing = repairingProjectSlugs.includes(projectSlug);
+  const isSubmitting = submittingProjectSlugs.includes(projectSlug);
   const isVersioning = versioningProjectSlugs.includes(projectSlug);
 
   if (!project && !hydrated) {
@@ -87,15 +94,20 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
         {syncError && <div className="sync-banner panel">{syncError}</div>}
         <WorkspaceShell
           isCompiling={isCompiling}
+          isExporting={isExporting}
           isRepairing={isRepairing}
+          isSubmitting={isSubmitting}
           isVersioning={isVersioning}
           onApplyRepair={() => applyProjectRepair(project.slug)}
           onCompile={() => compileProject(project.slug)}
           onCreateSnapshot={(snapshotLabel) => createProjectSnapshot(project.slug, snapshotLabel)}
           onCreateFile={(fileName) => createProjectFile(project.slug, fileName)}
           onCreateSource={(input) => createProjectSource(project.slug, input)}
+          onGenerateExportArtifact={() => generateProjectExportArtifact(project.slug)}
           onRollbackRepair={() => rollbackProjectRepair(project.slug)}
+          onRunSubmissionPreflight={() => runProjectSubmissionPreflight(project.slug)}
           onRestoreSnapshot={(snapshotId) => restoreProjectSnapshot(project.slug, snapshotId)}
+          onSelectExportProfile={(profileId) => selectProjectExportProfile(project.slug, profileId)}
           onSelectFile={(fileName) => selectProjectFile(project.slug, fileName)}
           onUpdateDocument={(fileName, content) => updateProjectDocument(project.slug, fileName, content)}
           project={project}

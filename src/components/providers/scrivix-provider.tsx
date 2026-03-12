@@ -31,6 +31,8 @@ type ScrivixContextValue = {
   hydrated: boolean;
   syncError: string | null;
   compilingProjectSlugs: string[];
+  exportingProjectSlugs: string[];
+  submittingProjectSlugs: string[];
   repairingProjectSlugs: string[];
   versioningProjectSlugs: string[];
   projects: ProjectRecord[];
@@ -42,8 +44,11 @@ type ScrivixContextValue = {
   createProjectSnapshot: (projectSlug: string, snapshotLabel?: string) => Promise<void>;
   createProjectFile: (projectSlug: string, fileName: string) => Promise<void>;
   createProjectSource: (projectSlug: string, input: SourceDraftInput) => Promise<void>;
+  generateProjectExportArtifact: (projectSlug: string) => Promise<void>;
   rollbackProjectRepair: (projectSlug: string) => Promise<void>;
+  runProjectSubmissionPreflight: (projectSlug: string) => Promise<void>;
   restoreProjectSnapshot: (projectSlug: string, snapshotId: string) => Promise<void>;
+  selectProjectExportProfile: (projectSlug: string, profileId: string) => Promise<void>;
   updateProjectDocument: (projectSlug: string, fileName: string, content: string) => void;
   selectProjectFile: (projectSlug: string, fileName: string) => Promise<void>;
 };
@@ -86,6 +91,8 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
   const [hydrated, setHydrated] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [compilingProjectSlugs, setCompilingProjectSlugs] = useState<string[]>([]);
+  const [exportingProjectSlugs, setExportingProjectSlugs] = useState<string[]>([]);
+  const [submittingProjectSlugs, setSubmittingProjectSlugs] = useState<string[]>([]);
   const [repairingProjectSlugs, setRepairingProjectSlugs] = useState<string[]>([]);
   const [versioningProjectSlugs, setVersioningProjectSlugs] = useState<string[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>(() => seedProjects.map((project) => applyWorkspaceIntelligence(project)));
@@ -271,6 +278,49 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
     }
   }
 
+  async function selectProjectExportProfile(projectSlug: string, profileId: string) {
+    startTransition(() => {
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: "Updating export profile…",
+            workspace: {
+              ...project.workspace,
+              activeExportProfile: profileId,
+            },
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "selectExportProfile",
+          exportProfileId: profileId,
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The export profile could not be updated.");
+      });
+    }
+  }
+
   async function createProjectSnapshot(projectSlug: string, snapshotLabel?: string) {
     startTransition(() => {
       setVersioningProjectSlugs((current) => [...new Set([...current, projectSlug])]);
@@ -315,6 +365,49 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
     }
   }
 
+  async function generateProjectExportArtifact(projectSlug: string) {
+    startTransition(() => {
+      setExportingProjectSlugs((current) => [...new Set([...current, projectSlug])]);
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: "Generating export package…",
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "generateExportArtifact",
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The export package could not be generated.");
+      });
+    } finally {
+      startTransition(() => {
+        setExportingProjectSlugs((current) => current.filter((slug) => slug !== projectSlug));
+      });
+    }
+  }
+
   async function rollbackProjectRepair(projectSlug: string) {
     startTransition(() => {
       setRepairingProjectSlugs((current) => [...new Set([...current, projectSlug])]);
@@ -354,6 +447,49 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
     } finally {
       startTransition(() => {
         setRepairingProjectSlugs((current) => current.filter((slug) => slug !== projectSlug));
+      });
+    }
+  }
+
+  async function runProjectSubmissionPreflight(projectSlug: string) {
+    startTransition(() => {
+      setSubmittingProjectSlugs((current) => [...new Set([...current, projectSlug])]);
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: "Running submission preflight…",
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "runSubmissionPreflight",
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The submission preflight could not be completed.");
+      });
+    } finally {
+      startTransition(() => {
+        setSubmittingProjectSlugs((current) => current.filter((slug) => slug !== projectSlug));
       });
     }
   }
@@ -633,6 +769,8 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
         hydrated,
         syncError,
         compilingProjectSlugs,
+        exportingProjectSlugs,
+        submittingProjectSlugs,
         repairingProjectSlugs,
         versioningProjectSlugs,
         projects,
@@ -644,8 +782,11 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
         createProjectSnapshot,
         createProjectFile,
         createProjectSource,
+        generateProjectExportArtifact,
         rollbackProjectRepair,
+        runProjectSubmissionPreflight,
         restoreProjectSnapshot,
+        selectProjectExportProfile,
         updateProjectDocument,
         selectProjectFile,
       }}

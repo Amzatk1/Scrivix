@@ -107,6 +107,36 @@ export type RollbackSnapshot = {
   documents: Record<string, string>;
 };
 
+export type ExportProfile = {
+  id: string;
+  label: string;
+  format: "pdf" | "docx" | "html" | "zip";
+  description: string;
+};
+
+export type ExportArtifact = {
+  id: string;
+  label: string;
+  profileId: string;
+  profileLabel: string;
+  targetFormat: ExportProfile["format"];
+  outputFormat: "pdf" | "docx" | "html" | "zip";
+  fileName: string;
+  downloadPath: string;
+  createdAt: string;
+  sizeLabel: string;
+  summary: string;
+};
+
+export type SubmissionCheck = {
+  id: string;
+  label: string;
+  detail: string;
+  status: "ready" | "warn" | "block";
+  tone: StatusTone;
+  location?: string;
+};
+
 export type SearchHit = {
   term: string;
   summary: string;
@@ -133,6 +163,12 @@ export type WorkspaceRecord = {
   buildMessages: BuildMessage[];
   repairSuggestion?: RepairSuggestion | null;
   rollbackSnapshot?: RollbackSnapshot | null;
+  exportProfiles?: ExportProfile[];
+  activeExportProfile?: string | null;
+  exportArtifacts?: ExportArtifact[];
+  submissionChecks?: SubmissionCheck[];
+  submissionStatus?: string;
+  lastPreflight?: string | null;
   aiAssist: {
     title: string;
     body: string;
