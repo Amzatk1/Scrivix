@@ -105,7 +105,8 @@ export function deriveSubmissionChecks(project: ProjectRecord, activeExportProfi
   const hasBuildWarning = buildMessages.some((message) => message.severity === "warn");
   const uncitedSourceCount = project.workspace.sources.filter((source) => /^uncited$/i.test(source.state)).length;
   const versionSnapshotCount = project.workspace.versionSnapshots?.length ?? 0;
-  const unresolvedComments = project.workspace.comments.length;
+  const unresolvedComments = project.workspace.comments.filter((comment) => comment.status !== "resolved").length;
+  const resolvedComments = project.workspace.comments.length - unresolvedComments;
   const evidenceGapCount = project.workspace.evidenceIssues.length;
 
   const checks: SubmissionCheck[] = [
@@ -138,7 +139,9 @@ export function deriveSubmissionChecks(project: ProjectRecord, activeExportProfi
       detail:
         unresolvedComments > 0
           ? `${unresolvedComments} reviewer ${unresolvedComments === 1 ? "comment is" : "comments are"} still open in the workspace.`
-          : "No unresolved reviewer comments remain in the current workspace.",
+          : resolvedComments > 0
+            ? `All reviewer comments are resolved. ${resolvedComments} resolved ${resolvedComments === 1 ? "comment" : "comments"} remain in history.`
+            : "No unresolved reviewer comments remain in the current workspace.",
       status: unresolvedComments >= 4 ? "block" : unresolvedComments > 0 ? "warn" : "ready",
       tone: unresolvedComments >= 4 ? "warn" : unresolvedComments > 0 ? "neutral" : "good",
     },

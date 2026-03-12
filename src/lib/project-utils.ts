@@ -2,6 +2,7 @@ import {
   getTemplateBySlug,
   projects as seedProjects,
   templates,
+  type ActionItem,
   type BuildMessage,
   type FileType,
   type OutlineSection,
@@ -111,9 +112,30 @@ export function buildProjectFromTemplate(input: CreateProjectInput, existingProj
   baseProject.audience = audience;
   baseProject.mode = input.mode;
   baseProject.queue = [
-    "Review the starter structure",
-    "Import sources or notes",
-    "Draft the first section before export",
+    {
+      id: `queue-${slug}-1`,
+      label: "Review the starter structure",
+      status: "open",
+      sourceType: "seed",
+      owner: "You",
+      dueLabel: "Today",
+    },
+    {
+      id: `queue-${slug}-2`,
+      label: "Import sources or notes",
+      status: "open",
+      sourceType: "seed",
+      owner: "You",
+      dueLabel: "This week",
+    },
+    {
+      id: `queue-${slug}-3`,
+      label: "Draft the first section before export",
+      status: "open",
+      sourceType: "seed",
+      owner: "You",
+      dueLabel: "Before export",
+    },
   ];
   baseProject.workspace.defaultMode = "Draft";
   baseProject.workspace.compileStatus = baseProject.status;
@@ -457,6 +479,38 @@ export function buildImportedProject(input: ImportProjectInput, existingProjects
   const searchHits = deriveSearchHits(Object.values(documents).join("\n\n"), outline, bibliographyText);
   const bibliographyEntryCount = sourceCards.length;
   const importedFileCount = input.importedFiles?.length ?? 0;
+  const importQueue: ActionItem[] = [
+    {
+      id: `queue-import-${baseProject.slug}-1`,
+      label: "Review imported structure and file names",
+      status: "open",
+      sourceType: "system",
+      owner: "You",
+      target: currentFile,
+      dueLabel: "Today",
+    },
+    {
+      id: `queue-import-${baseProject.slug}-2`,
+      label:
+        bibliographyEntryCount > 0
+          ? `Validate ${bibliographyEntryCount} imported bibliography entr${bibliographyEntryCount === 1 ? "y" : "ies"}`
+          : "Add supporting sources to the library",
+      status: "open",
+      sourceType: "system",
+      owner: "You",
+      target: bibliographyEntryCount > 0 ? "references.bib" : currentFile,
+      dueLabel: "Before export",
+    },
+    {
+      id: `queue-import-${baseProject.slug}-3`,
+      label: "Run an evidence pass before final export",
+      status: "open",
+      sourceType: "system",
+      owner: "You",
+      target: currentFile,
+      dueLabel: "Before export",
+    },
+  ];
 
   const importedProject: ProjectRecord = {
     ...baseProject,
@@ -470,11 +524,7 @@ export function buildImportedProject(input: ImportProjectInput, existingProjects
     meta: "Imported into workspace",
     stage: "Import review",
     dueLabel: "No deadline set",
-    queue: [
-      "Review imported structure and file names",
-      bibliographyEntryCount > 0 ? `Validate ${bibliographyEntryCount} imported bibliography entr${bibliographyEntryCount === 1 ? "y" : "ies"}` : "Add supporting sources to the library",
-      "Run an evidence pass before final export",
-    ],
+    queue: importQueue,
     workspace: {
       ...baseProject.workspace,
       defaultMode: input.mode === "latex" ? "Research" : "Draft",

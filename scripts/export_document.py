@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import html
 import json
 import sys
 from pathlib import Path
@@ -15,6 +16,10 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 def load_manifest(path_str: str):
     with open(path_str, "r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def escape_text(value: str):
+    return html.escape(value, quote=False)
 
 
 def build_pdf(manifest: dict, output_path: Path):
@@ -55,17 +60,17 @@ def build_pdf(manifest: dict, output_path: Path):
     )
 
     story = [
-        Paragraph(manifest["title"], title_style),
-        Paragraph(f'{manifest["subtitle"]} · {manifest["audience"]}', meta_style),
-        Paragraph(f'Export profile: {manifest["profile_label"]}', meta_style),
+        Paragraph(escape_text(manifest["title"]), title_style),
+        Paragraph(escape_text(f'{manifest["subtitle"]} · {manifest["audience"]}'), meta_style),
+        Paragraph(escape_text(f'Export profile: {manifest["profile_label"]}'), meta_style),
         Spacer(1, 0.2 * inch),
     ]
 
     for section in manifest["sections"]:
-        story.append(Paragraph(section["fileName"], heading_style))
+        story.append(Paragraph(escape_text(section["fileName"]), heading_style))
 
         for paragraph in section["paragraphs"]:
-            story.append(Paragraph(paragraph.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"), body_style))
+            story.append(Paragraph(escape_text(paragraph), body_style))
 
         story.append(Spacer(1, 0.12 * inch))
 
@@ -109,11 +114,11 @@ def main():
     manifest = load_manifest(manifest_path)
 
     if output_format == "pdf":
-      build_pdf(manifest, output_path)
+        build_pdf(manifest, output_path)
     elif output_format == "docx":
-      build_docx(manifest, output_path)
+        build_docx(manifest, output_path)
     else:
-      raise SystemExit(f"Unsupported output format: {output_format}")
+        raise SystemExit(f"Unsupported output format: {output_format}")
 
 
 if __name__ == "__main__":

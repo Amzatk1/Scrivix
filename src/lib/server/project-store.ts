@@ -8,7 +8,10 @@ import {
 } from "@/lib/product-data";
 import {
   applyWorkspaceIntelligence,
+  buildCommentActionItem,
+  buildCommentRecord,
   buildSourceRecord,
+  type CommentDraftInput,
   type SourceDraftInput,
 } from "@/lib/document-intelligence";
 import { runProjectCompileWorker, type CompileResult } from "@/lib/server/compile-runner";
@@ -374,6 +377,194 @@ export async function createProjectSource(projectSlug: string, input: SourceDraf
           {
             label: "Source added",
             meta: source.title,
+          },
+          ...project.workspace.history.slice(0, 4),
+        ],
+      },
+    });
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function createProjectComment(projectSlug: string, input: CommentDraftInput) {
+  const projects = await readProjectsFromDisk();
+  const author = input.author.trim();
+  const body = input.body.trim();
+  const target = input.target.trim();
+
+  if (!author || !body || !target) {
+    return null;
+  }
+
+  const timestamp = `Today, ${compileTimestamp()}`;
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    const comment = {
+      ...buildCommentRecord(
+        {
+          author,
+          body,
+          target,
+        },
+        project.workspace.comments,
+      ),
+      createdAt: timestamp,
+    };
+
+    return applyWorkspaceIntelligence({
+      ...project,
+      meta: "Comment added",
+      workspace: {
+        ...project.workspace,
+        comments: [comment, ...project.workspace.comments],
+        history: [
+          {
+            label: "Comment added",
+            meta: `${author} · ${target}`,
+          },
+          ...project.workspace.history.slice(0, 4),
+        ],
+      },
+    });
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function updateProjectCommentStatus(
+  projectSlug: string,
+  commentId: string,
+  status: "open" | "resolved",
+) {
+  const projects = await readProjectsFromDisk();
+  const timestamp = compileTimestamp();
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    const existingComment = project.workspace.comments.find((comment) => comment.id === commentId);
+
+    if (!existingComment) {
+      return {
+        ...project,
+        meta: "Comment not found",
+      };
+    }
+
+    return applyWorkspaceIntelligence({
+      ...project,
+      meta: status === "resolved" ? "Comment resolved" : "Comment reopened",
+      workspace: {
+        ...project.workspace,
+        comments: project.workspace.comments.map((comment) =>
+          comment.id === commentId
+            ? {
+                ...comment,
+                status,
+              }
+            : comment,
+        ),
+        history: [
+          {
+            label: status === "resolved" ? "Comment resolved" : "Comment reopened",
+            meta: `${existingComment.author} · ${existingComment.target} · Today, ${timestamp}`,
+          },
+          ...project.workspace.history.slice(0, 4),
+        ],
+      },
+    });
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function queueProjectComment(projectSlug: string, commentId: string) {
+  const projects = await readProjectsFromDisk();
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    const comment = project.workspace.comments.find((entry) => entry.id === commentId);
+
+    if (!comment) {
+      return {
+        ...project,
+        meta: "Comment not found",
+      };
+    }
+
+    const queueItem = buildCommentActionItem(comment, project.queue, project.dueLabel || "Before export");
+
+    if (project.queue.some((item) => item.id === queueItem.id || item.sourceId === commentId)) {
+      return {
+        ...project,
+        meta: "Action already queued",
+      };
+    }
+
+    return applyWorkspaceIntelligence({
+      ...project,
+      meta: "Comment converted to action",
+      queue: [queueItem, ...project.queue].slice(0, 8),
+      workspace: {
+        ...project.workspace,
+        history: [
+          {
+            label: "Queue item added",
+            meta: `${comment.author} · ${comment.target}`,
+          },
+          ...project.workspace.history.slice(0, 4),
+        ],
+      },
+    });
+  });
+
+  await writeProjectsToDisk(nextProjects);
+  return nextProjects.find((project) => project.slug === projectSlug);
+}
+
+export async function completeProjectQueueItem(projectSlug: string, queueItemId: string) {
+  const projects = await readProjectsFromDisk();
+  const nextProjects = projects.map((project) => {
+    if (project.slug !== projectSlug) {
+      return project;
+    }
+
+    const existingAction = project.queue.find((item) => item.id === queueItemId);
+
+    if (!existingAction) {
+      return {
+        ...project,
+        meta: "Action not found",
+      };
+    }
+
+    return applyWorkspaceIntelligence({
+      ...project,
+      meta: "Action completed",
+      queue: project.queue.map((item) =>
+        item.id === queueItemId
+          ? {
+              ...item,
+              status: "done",
+            }
+          : item,
+      ),
+      workspace: {
+        ...project.workspace,
+        history: [
+          {
+            label: "Queue item completed",
+            meta: existingAction.label,
           },
           ...project.workspace.history.slice(0, 4),
         ],

@@ -5,6 +5,8 @@ export type BuildSeverity = "error" | "warn" | "info";
 export type WorkspaceMode = "Draft" | "Research" | "Review" | "Submission";
 export type ProjectMode = "latex" | "hybrid" | "markdown" | "rich";
 export type FileType = "root" | "folder" | "file" | "bib" | "asset" | "config";
+export type ActionItemStatus = "open" | "done";
+export type ActionItemSourceType = "seed" | "comment" | "system";
 
 export type NavLink = {
   label: string;
@@ -53,15 +55,31 @@ export type SourceCard = {
   pinned?: boolean;
 };
 
+export type CommentStatus = "open" | "resolved";
+
 export type CommentRecord = {
+  id: string;
   author: string;
   body: string;
   target: string;
+  status: CommentStatus;
+  createdAt?: string;
 };
 
 export type HistoryEvent = {
   label: string;
   meta: string;
+};
+
+export type ActionItem = {
+  id: string;
+  label: string;
+  status: ActionItemStatus;
+  sourceType?: ActionItemSourceType;
+  sourceId?: string;
+  target?: string;
+  owner?: string;
+  dueLabel?: string;
 };
 
 export type TrustSignal = {
@@ -193,7 +211,7 @@ export type ProjectRecord = {
   dueLabel: string;
   audience: string;
   mode: ProjectMode;
-  queue: string[];
+  queue: ActionItem[];
   workspace: WorkspaceRecord;
 };
 
@@ -280,9 +298,33 @@ export const projects: ProjectRecord[] = [
     audience: "PhD Research",
     mode: "latex",
     queue: [
-      "Resolve 2 methodology comments",
-      "Patch bibliography metadata for 3 sources",
-      "Run final submission checklist after the next build",
+      {
+        id: "thesis-queue-1",
+        label: "Resolve methodology review comments",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "chapters/chapter-03-methodology.tex",
+        dueLabel: "Today",
+      },
+      {
+        id: "thesis-queue-2",
+        label: "Patch bibliography metadata for imported sources",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "references.bib",
+        dueLabel: "This week",
+      },
+      {
+        id: "thesis-queue-3",
+        label: "Run final submission checklist after the next build",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "submission-checklist.md",
+        dueLabel: "Before submission",
+      },
     ],
     workspace: {
       defaultMode: "Research",
@@ -385,14 +427,20 @@ both perceived usability and observable writing outcomes.
       ],
       comments: [
         {
+          id: "comment-methodology-1",
           author: "Dr. Shah",
           body: "Clarify why this sampling choice is defensible against selection bias.",
           target: "Paragraph 4",
+          status: "open",
+          createdAt: "Today, 08:54",
         },
         {
+          id: "comment-methodology-2",
           author: "Mina A.",
           body: "The transition from design to data collection feels abrupt.",
           target: "Section 3.1",
+          status: "open",
+          createdAt: "Today, 09:02",
         },
       ],
       history: [
@@ -461,9 +509,33 @@ both perceived usability and observable writing outcomes.
     audience: "Policy Team",
     mode: "hybrid",
     queue: [
-      "Cite all claims in section 2 before circulation",
-      "Prepare a redline version for legal review",
-      "Convert stakeholder comments into action items",
+      {
+        id: "policy-queue-1",
+        label: "Cite all recommendation claims before circulation",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "sections/recommendations.svx",
+        dueLabel: "Before circulation",
+      },
+      {
+        id: "policy-queue-2",
+        label: "Prepare a redline version for legal review",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "brief.svx",
+        dueLabel: "Friday",
+      },
+      {
+        id: "policy-queue-3",
+        label: "Convert stakeholder comments into action items",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "Executive summary",
+        dueLabel: "Before Monday",
+      },
     ],
     workspace: {
       defaultMode: "Review",
@@ -549,14 +621,20 @@ tone: formal`,
       ],
       comments: [
         {
+          id: "comment-policy-1",
           author: "Legal counsel",
           body: "Recommendation 3 needs narrower wording before external distribution.",
           target: "Section 3",
+          status: "open",
+          createdAt: "Today, 07:18",
         },
         {
+          id: "comment-policy-2",
           author: "Chief of staff",
           body: "The summary should say what changes in the next 90 days, not just the longer-term direction.",
           target: "Executive summary",
+          status: "open",
+          createdAt: "Yesterday, 17:42",
         },
       ],
       history: [
@@ -620,9 +698,33 @@ tone: formal`,
     audience: "Founder / Product",
     mode: "markdown",
     queue: [
-      "Resolve GTM comments from the finance lead",
-      "Tighten the architecture section for non-technical readers",
-      "Export a short appendix and a full technical version",
+      {
+        id: "seriesa-queue-1",
+        label: "Resolve GTM comments from the finance lead",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "Section 4",
+        dueLabel: "Today",
+      },
+      {
+        id: "seriesa-queue-2",
+        label: "Tighten the architecture section for non-technical readers",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "appendix/system-architecture.md",
+        dueLabel: "Before partner meeting",
+      },
+      {
+        id: "seriesa-queue-3",
+        label: "Export a short appendix and a full technical version",
+        status: "open",
+        sourceType: "seed",
+        owner: "You",
+        target: "narrative.md",
+        dueLabel: "Tomorrow morning",
+      },
     ],
     workspace: {
       defaultMode: "Draft",
@@ -695,14 +797,20 @@ submission readiness in one product shell.`,
       ],
       comments: [
         {
+          id: "comment-seriesa-1",
           author: "Finance lead",
           body: "The margin profile is clear, but the expansion path still reads too product-heavy.",
           target: "Section 4",
+          status: "open",
+          createdAt: "Today, 06:14",
         },
         {
+          id: "comment-seriesa-2",
           author: "Advisor",
           body: "The architecture section is strong but needs one simpler explanation for generalist investors.",
           target: "Section 3",
+          status: "open",
+          createdAt: "Yesterday, 21:34",
         },
       ],
       history: [

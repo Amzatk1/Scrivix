@@ -7,7 +7,7 @@ export function DashboardView() {
   const { projects, syncError } = useScrivix();
   const featuredProject = projects[0];
   const trustSignals = featuredProject?.workspace.trustSignals ?? [];
-  const queue = featuredProject?.queue ?? [];
+  const queue = featuredProject?.queue.filter((item) => item.status !== "done") ?? [];
 
   return (
     <main className="dashboard-page">
@@ -68,13 +68,19 @@ export function DashboardView() {
         <article className="panel dashboard-card">
           <div className="card-heading">
             <h2>Priority queue</h2>
-            <span className="quiet-label">Today</span>
+            <span className="quiet-label">{queue.length} open</span>
           </div>
           <div className="queue-list">
             {queue.map((item) => (
-              <div key={item} className="queue-item">
+              <div key={item.id} className="queue-item">
                 <span className="queue-dot" />
-                <p>{item}</p>
+                <div className="queue-item__body">
+                  <p>{item.label}</p>
+                  <small>
+                    {item.owner ?? "Unassigned"}
+                    {item.dueLabel ? ` · ${item.dueLabel}` : ""}
+                  </small>
+                </div>
               </div>
             ))}
           </div>

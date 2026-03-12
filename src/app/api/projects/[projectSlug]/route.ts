@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import {
   applyProjectRepair,
+  completeProjectQueueItem,
+  createProjectComment,
   createProjectSnapshot,
   createProjectFile,
   createProjectSource,
   generateProjectExportArtifact,
   getProject,
+  queueProjectComment,
   rollbackProjectRepair,
   runProjectSubmissionPreflight,
   restoreProjectSnapshot,
   selectProjectExportProfile,
   selectProjectFile,
+  updateProjectCommentStatus,
   updateProjectDocument,
 } from "@/lib/server/project-store";
 
@@ -41,6 +45,14 @@ export async function PATCH(request: Request, context: RouteContext) {
         exportProfileId?: string;
         snapshotId?: string;
         snapshotLabel?: string;
+        commentId?: string;
+        commentStatus?: "open" | "resolved";
+        queueItemId?: string;
+        comment?: {
+          author?: string;
+          body?: string;
+          target?: string;
+        };
         source?: {
           title?: string;
           detail?: string;
@@ -117,6 +129,38 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ project });
   }
 
+  if (body.action === "createComment") {
+    if (!body.comment?.author || !body.comment?.body || !body.comment?.target) {
+      return NextResponse.json({ error: "Invalid comment payload." }, { status: 400 });
+    }
+
+    const project = await createProjectComment(projectSlug, {
+      author: body.comment.author,
+      body: body.comment.body,
+      target: body.comment.target,
+    });
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "queueComment") {
+    if (!body.commentId) {
+      return NextResponse.json({ error: "Missing comment identifier." }, { status: 400 });
+    }
+
+    const project = await queueProjectComment(projectSlug, body.commentId);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
   if (body.action === "createSnapshot") {
     const project = await createProjectSnapshot(projectSlug, body.snapshotLabel);
 
@@ -177,6 +221,34 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const project = await restoreProjectSnapshot(projectSlug, body.snapshotId);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "updateCommentStatus") {
+    if (!body.commentId || !body.commentStatus) {
+      return NextResponse.json({ error: "Missing comment update payload." }, { status: 400 });
+    }
+
+    const project = await updateProjectCommentStatus(projectSlug, body.commentId, body.commentStatus);
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ project });
+  }
+
+  if (body.action === "completeQueueItem") {
+    if (!body.queueItemId) {
+      return NextResponse.json({ error: "Missing queue item." }, { status: 400 });
+    }
+
+    const project = await completeProjectQueueItem(projectSlug, body.queueItemId);
 
     if (!project) {
       return NextResponse.json({ error: "Project not found." }, { status: 404 });

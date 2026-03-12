@@ -6,6 +6,7 @@ import { buildPreviewModel } from "@/lib/editor-utils";
 import {
   canInsertCitationIntoFile,
   formatCitationToken,
+  type CommentDraftInput,
   type SourceDraftInput,
 } from "@/lib/document-intelligence";
 import type { BuildSeverity, ProjectRecord, SubmissionCheck } from "@/lib/product-data";
@@ -26,6 +27,8 @@ type WorkspaceShellProps = {
   isVersioning: boolean;
   onApplyRepair: () => void;
   onCompile: () => void;
+  onCompleteQueueItem: (queueItem: string) => Promise<void> | void;
+  onCreateComment: (input: CommentDraftInput) => Promise<void> | void;
   onCreateSnapshot: (snapshotLabel?: string) => void;
   onCreateFile: (fileName: string) => void;
   onCreateSource: (input: SourceDraftInput) => Promise<void> | void;
@@ -33,7 +36,9 @@ type WorkspaceShellProps = {
   onRollbackRepair: () => void;
   onRunSubmissionPreflight: () => void;
   onRestoreSnapshot: (snapshotId: string) => void;
+  onQueueComment: (commentId: string) => Promise<void> | void;
   onSelectExportProfile: (profileId: string) => void;
+  onUpdateCommentStatus: (commentId: string, status: "open" | "resolved") => Promise<void> | void;
   project: ProjectRecord;
   onSelectFile: (fileName: string) => void;
   onUpdateDocument: (fileName: string, content: string) => void;
@@ -44,6 +49,12 @@ type SourceDraftState = {
   author: string;
   year: string;
   detail: string;
+};
+
+type CommentDraftState = {
+  author: string;
+  body: string;
+  target: string;
 };
 
 type ConsoleEntry = {
@@ -58,6 +69,12 @@ const emptySourceDraft: SourceDraftState = {
   author: "",
   year: "",
   detail: "",
+};
+
+const emptyCommentDraft: CommentDraftState = {
+  author: "",
+  body: "",
+  target: "",
 };
 
 function buildDiffPreview(beforeContent: string, afterContent: string) {
@@ -103,6 +120,8 @@ export function WorkspaceShell({
   isVersioning,
   onApplyRepair,
   onCompile,
+  onCompleteQueueItem,
+  onCreateComment,
   onCreateSnapshot,
   onCreateFile,
   onCreateSource,
@@ -110,7 +129,9 @@ export function WorkspaceShell({
   onRollbackRepair,
   onRunSubmissionPreflight,
   onRestoreSnapshot,
+  onQueueComment,
   onSelectExportProfile,
+  onUpdateCommentStatus,
   project,
   onSelectFile,
   onUpdateDocument,
@@ -126,6 +147,13 @@ export function WorkspaceShell({
   const [sourceDraft, setSourceDraft] = useState<SourceDraftState>(emptySourceDraft);
   const [isAddingSource, setIsAddingSource] = useState(false);
   const [showSourceComposer, setShowSourceComposer] = useState(false);
+  const [commentDraft, setCommentDraft] = useState<CommentDraftState>({
+    ...emptyCommentDraft,
+    target: workspace.currentFile,
+  });
+  const [isAddingComment, setIsAddingComment] = useState(false);
+  const [showCommentComposer, setShowCommentComposer] = useState(false);
+  const [showResolvedComments, setShowResolvedComments] = useState(false);
   const [showRepairDiff, setShowRepairDiff] = useState(false);
   const [showRepairExplanation, setShowRepairExplanation] = useState(false);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(workspace.versionSnapshots?.[0]?.id ?? null);
@@ -143,6 +171,12 @@ export function WorkspaceShell({
   const activeExportProfile = workspace.activeExportProfile ?? exportProfiles[0]?.id ?? null;
   const activeProfileRecord = exportProfiles.find((profile) => profile.id === activeExportProfile) ?? exportProfiles[0] ?? null;
   const submissionChecks = workspace.submissionChecks ?? [];
+  const queueItems = project.queue ?? [];
+  const openQueueItems = queueItems.filter((item) => item.status !== "done");
+  const completedQueueItems = queueItems.filter((item) => item.status === "done");
+  const openComments = workspace.comments.filter((comment) => comment.status !== "resolved");
+  const resolvedComments = workspace.comments.filter((comment) => comment.status === "resolved");
+  const visibleComments = showResolvedComments ? workspace.comments : openComments;
   const versionSnapshots = workspace.versionSnapshots ?? [];
   const selectedSnapshot =
     versionSnapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? versionSnapshots[0] ?? null;
@@ -208,6 +242,10 @@ export function WorkspaceShell({
     }
   }, [selectedSnapshotId, versionSnapshots]);
 
+  useEffect(() => {
+    setCommentDraft((current) => (current.target ? current : { ...current, target: workspace.currentFile }));
+  }, [workspace.currentFile]);
+
   async function handleCreateSource() {
     if (!sourceDraft.title.trim() || !sourceDraft.detail.trim()) {
       return;
@@ -221,6 +259,25 @@ export function WorkspaceShell({
       setShowSourceComposer(false);
     } finally {
       setIsAddingSource(false);
+    }
+  }
+
+  async function handleCreateComment() {
+    if (!commentDraft.author.trim() || !commentDraft.body.trim() || !commentDraft.target.trim()) {
+      return;
+    }
+
+    setIsAddingComment(true);
+
+    try {
+      await onCreateComment(commentDraft);
+      setCommentDraft({
+        ...emptyCommentDraft,
+        target: workspace.currentFile,
+      });
+      setShowCommentComposer(false);
+    } finally {
+      setIsAddingComment(false);
     }
   }
 
@@ -598,6 +655,40 @@ export function WorkspaceShell({
                   <p>{workspace.nextStep}</p>
                 </div>
 
+                <div className="assistant-card">
+                  <div className="utility-section-header utility-section-header--compact">
+                    <div>
+                      <p className="eyebrow">Action queue</p>
+                      <h3>{openQueueItems.length} active items</h3>
+                    </div>
+                    <span className="quiet-label">{completedQueueItems.length} done</span>
+                  </div>
+                  {openQueueItems.length > 0 ? (
+                    <div className="queue-list queue-list--utility">
+                      {openQueueItems.slice(0, 6).map((item) => (
+                        <div key={item.id} className="queue-item queue-item--utility">
+                          <span className="queue-dot" />
+                          <div className="queue-item__body">
+                            <p>{item.label}</p>
+                            <small>
+                              {item.owner ?? "Unassigned"}
+                              {item.target ? ` · ${item.target}` : ""}
+                              {item.dueLabel ? ` · ${item.dueLabel}` : ""}
+                            </small>
+                          </div>
+                          <button className="ghost-button ghost-button--compact" onClick={() => void onCompleteQueueItem(item.id)} type="button">
+                            Done
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="utility-banner utility-banner--positive">
+                      No queued actions right now. Convert a comment into an action item when review feedback needs follow-through.
+                    </div>
+                  )}
+                </div>
+
                 {hasRollbackSnapshot && !repairSuggestion && (
                   <div className="assistant-card">
                     <p className="eyebrow">Rollback available</p>
@@ -724,15 +815,135 @@ export function WorkspaceShell({
 
             {utilityTab === "Comments" && (
               <div className="utility-content">
-                {workspace.comments.map((comment) => (
-                  <article key={`${comment.author}-${comment.target}`} className="comment-card">
-                    <div className="comment-card__header">
-                      <strong>{comment.author}</strong>
-                      <span>{comment.target}</span>
+                <div className="utility-section-header">
+                  <div>
+                    <p className="eyebrow">Review threads</p>
+                    <h3>{openComments.length} open comments</h3>
+                  </div>
+                  <button
+                    className="ghost-button ghost-button--compact"
+                    onClick={() => {
+                      setShowCommentComposer((value) => !value);
+                      setCommentDraft((current) => ({
+                        ...current,
+                        target: current.target || workspace.currentFile,
+                      }));
+                    }}
+                    type="button"
+                  >
+                    {showCommentComposer ? "Close" : "Add comment"}
+                  </button>
+                </div>
+
+                <div className="assistant-actions">
+                  <button className="ghost-button ghost-button--compact" onClick={() => setShowResolvedComments((value) => !value)} type="button">
+                    {showResolvedComments ? "Hide resolved" : `Show resolved (${resolvedComments.length})`}
+                  </button>
+                </div>
+
+                {showCommentComposer && (
+                  <div className="source-form-card">
+                    <div className="source-form-grid">
+                      <label className="source-field">
+                        <span>Author</span>
+                        <input
+                          onChange={(event) => setCommentDraft((current) => ({ ...current, author: event.target.value }))}
+                          placeholder="Reviewer name"
+                          value={commentDraft.author}
+                        />
+                      </label>
+                      <label className="source-field">
+                        <span>Target</span>
+                        <input
+                          onChange={(event) => setCommentDraft((current) => ({ ...current, target: event.target.value }))}
+                          placeholder={workspace.currentFile}
+                          value={commentDraft.target}
+                        />
+                      </label>
+                      <label className="source-field source-field--full">
+                        <span>Comment</span>
+                        <textarea
+                          onChange={(event) => setCommentDraft((current) => ({ ...current, body: event.target.value }))}
+                          placeholder="Add a review note or revision request"
+                          rows={3}
+                          value={commentDraft.body}
+                        />
+                      </label>
                     </div>
-                    <p>{comment.body}</p>
-                  </article>
-                ))}
+                    <div className="assistant-actions">
+                      <button className="primary-button" disabled={isAddingComment} onClick={() => void handleCreateComment()} type="button">
+                        {isAddingComment ? "Adding..." : "Save comment"}
+                      </button>
+                      <button
+                        className="ghost-button"
+                        onClick={() => {
+                          setCommentDraft({
+                            ...emptyCommentDraft,
+                            target: workspace.currentFile,
+                          });
+                          setShowCommentComposer(false);
+                        }}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {visibleComments.length > 0 ? (
+                  visibleComments.map((comment) => {
+                    const canOpenTarget = Boolean(workspace.documents[comment.target]);
+                    const alreadyQueued = queueItems.some((item) => item.sourceId === comment.id && item.status !== "done");
+
+                    return (
+                      <article
+                        key={comment.id}
+                        className={comment.status === "resolved" ? "comment-card comment-card--resolved" : "comment-card"}
+                      >
+                        <div className="comment-card__header">
+                          <div>
+                            <strong>{comment.author}</strong>
+                            <span>{comment.target}</span>
+                          </div>
+                          <span className={comment.status === "resolved" ? "status-chip status-chip--good" : "status-chip status-chip--neutral"}>
+                            {comment.status === "resolved" ? "Resolved" : "Open"}
+                          </span>
+                        </div>
+                        <p>{comment.body}</p>
+                        <div className="comment-card__meta">
+                          <small>{comment.createdAt ?? "Today"}</small>
+                        </div>
+                        <div className="assistant-actions">
+                          {canOpenTarget && (
+                            <button className="ghost-button ghost-button--compact" onClick={() => onSelectFile(comment.target)} type="button">
+                              Open file
+                            </button>
+                          )}
+                          <button
+                            className="ghost-button ghost-button--compact"
+                            disabled={alreadyQueued}
+                            onClick={() => void onQueueComment(comment.id)}
+                            type="button"
+                          >
+                            {alreadyQueued ? "Queued" : "Add to queue"}
+                          </button>
+                          <button
+                            className="ghost-button ghost-button--compact"
+                            onClick={() => void onUpdateCommentStatus(comment.id, comment.status === "resolved" ? "open" : "resolved")}
+                            type="button"
+                          >
+                            {comment.status === "resolved" ? "Reopen" : "Resolve"}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="utility-banner utility-banner--positive">
+                    No {showResolvedComments ? "" : "open "}comments to review right now.
+                  </div>
+                )}
               </div>
             )}
 
@@ -904,7 +1115,7 @@ export function WorkspaceShell({
                       {isSubmitting ? "Running..." : "Run preflight"}
                     </button>
                     <button className="ghost-button" disabled={isExporting} onClick={onGenerateExportArtifact} type="button">
-                      {isExporting ? "Generating..." : "Generate package"}
+                      {isExporting ? "Generating..." : "Generate export"}
                     </button>
                     <button
                       className="ghost-button"
@@ -962,7 +1173,7 @@ export function WorkspaceShell({
                 <div className="utility-section-header utility-section-header--compact">
                   <div>
                     <p className="eyebrow">Generated artifacts</p>
-                    <h3>{exportArtifacts.length} downloadable packages</h3>
+                    <h3>{exportArtifacts.length} downloadable exports</h3>
                   </div>
                 </div>
                 {exportArtifacts.length > 0 ? (
@@ -971,7 +1182,7 @@ export function WorkspaceShell({
                       <article key={artifact.id} className="history-card history-card--artifact">
                         <strong>{artifact.profileLabel}</strong>
                         <span>
-                          {artifact.outputFormat.toUpperCase()} package · {artifact.sizeLabel}
+                          {artifact.outputFormat.toUpperCase()} {artifact.outputFormat === "zip" ? "archive" : "file"} · {artifact.sizeLabel}
                         </span>
                         <small>
                           Target: {artifact.targetFormat.toUpperCase()} · {artifact.createdAt}
@@ -990,7 +1201,7 @@ export function WorkspaceShell({
                     ))}
                   </div>
                 ) : (
-                  <div className="utility-banner">No export packages generated yet. Run preflight, then create a package for download.</div>
+                  <div className="utility-banner">No exports generated yet. Run preflight, then generate an artifact for download.</div>
                 )}
               </div>
             )}

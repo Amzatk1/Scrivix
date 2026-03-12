@@ -101,7 +101,7 @@ export function renderProjectExportHtml(project: ProjectRecord, profile: ExportP
         <h1>${project.title}</h1>
         <p class="meta">${project.subtitle} · ${project.audience}</p>
         <div class="callout">
-          <strong>Scrivix export package</strong>
+          <strong>Scrivix export preview</strong>
           <p>This export was generated from the current workspace state for the ${profile.label} profile.</p>
         </div>
       </header>
@@ -135,7 +135,7 @@ export function buildExportArtifactRecord(args: {
 }): ExportArtifact {
   return {
     id: args.id,
-    label: `${args.profile.label} package`,
+    label: `${args.profile.label} export`,
     profileId: args.profile.id,
     profileLabel: args.profile.label,
     targetFormat: args.profile.format,

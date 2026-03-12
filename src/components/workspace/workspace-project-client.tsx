@@ -12,6 +12,8 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
   const {
     applyProjectRepair,
     compileProject,
+    completeProjectQueueItem,
+    createProjectComment,
     compilingProjectSlugs,
     createProjectSnapshot,
     createProjectFile,
@@ -20,6 +22,7 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
     generateProjectExportArtifact,
     hydrated,
     projects,
+    queueProjectComment,
     repairingProjectSlugs,
     runProjectSubmissionPreflight,
     restoreProjectSnapshot,
@@ -28,6 +31,7 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
     selectProjectExportProfile,
     submittingProjectSlugs,
     syncError,
+    updateProjectCommentStatus,
     updateProjectDocument,
     versioningProjectSlugs,
   } = useScrivix();
@@ -100,6 +104,8 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
           isVersioning={isVersioning}
           onApplyRepair={() => applyProjectRepair(project.slug)}
           onCompile={() => compileProject(project.slug)}
+          onCompleteQueueItem={(queueItem) => completeProjectQueueItem(project.slug, queueItem)}
+          onCreateComment={(input) => createProjectComment(project.slug, input)}
           onCreateSnapshot={(snapshotLabel) => createProjectSnapshot(project.slug, snapshotLabel)}
           onCreateFile={(fileName) => createProjectFile(project.slug, fileName)}
           onCreateSource={(input) => createProjectSource(project.slug, input)}
@@ -109,6 +115,8 @@ export function WorkspaceProjectClient({ projectSlug }: WorkspaceProjectClientPr
           onRestoreSnapshot={(snapshotId) => restoreProjectSnapshot(project.slug, snapshotId)}
           onSelectExportProfile={(profileId) => selectProjectExportProfile(project.slug, profileId)}
           onSelectFile={(fileName) => selectProjectFile(project.slug, fileName)}
+          onQueueComment={(commentId) => queueProjectComment(project.slug, commentId)}
+          onUpdateCommentStatus={(commentId, status) => updateProjectCommentStatus(project.slug, commentId, status)}
           onUpdateDocument={(fileName, content) => updateProjectDocument(project.slug, fileName, content)}
           project={project}
         />

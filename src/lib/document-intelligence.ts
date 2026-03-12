@@ -1,4 +1,13 @@
-import type { BuildMessage, EvidenceIssue, ProjectMode, ProjectRecord, SourceCard, TrustSignal } from "@/lib/product-data";
+import type {
+  ActionItem,
+  BuildMessage,
+  CommentRecord,
+  EvidenceIssue,
+  ProjectMode,
+  ProjectRecord,
+  SourceCard,
+  TrustSignal,
+} from "@/lib/product-data";
 import { isLikelyHtml, sanitizePreviewHtml } from "@/lib/editor-utils";
 import { deriveRepairSuggestion } from "@/lib/repair-assistant";
 import {
@@ -16,6 +25,12 @@ export type SourceDraftInput = {
   year?: string;
   citationKey?: string;
   state?: string;
+};
+
+export type CommentDraftInput = {
+  author: string;
+  body: string;
+  target: string;
 };
 
 const citationPatternSource = String.raw`\\cite[a-zA-Z*]*\{([^}]+)\}|\[@([A-Za-z0-9:_-]+)\]|\[cite:([A-Za-z0-9:_-]+)\]`;
@@ -215,6 +230,37 @@ function buildSourceState(source: SourceCard, citedFiles: string[]) {
   return "Uncited";
 }
 
+function normalizeComment(comment: CommentRecord, index: number) {
+  return {
+    ...comment,
+    id: comment.id || `comment-${index + 1}-${keySlug(`${comment.author}-${comment.target}`)}`,
+    status: comment.status ?? "open",
+    createdAt: comment.createdAt ?? "Today",
+  };
+}
+
+function normalizeActionItem(item: ActionItem | string, index: number): ActionItem {
+  if (typeof item === "string") {
+    return {
+      id: `queue-${index + 1}-${keySlug(item)}`,
+      label: item,
+      status: "open",
+      sourceType: "seed",
+      owner: "You",
+      dueLabel: "Today",
+    };
+  }
+
+  return {
+    ...item,
+    id: item.id || `queue-${index + 1}-${keySlug(item.label)}`,
+    label: item.label,
+    status: item.status ?? "open",
+    owner: item.owner ?? "You",
+    dueLabel: item.dueLabel ?? "Today",
+  };
+}
+
 export function normalizeCitationKey(value: string) {
   const normalized = keySlug(value).replace(/-/g, "");
   return normalized || "source2026";
@@ -255,8 +301,55 @@ export function buildSourceRecord(input: SourceDraftInput, existingSources: Sour
   );
 }
 
+export function buildCommentRecord(input: CommentDraftInput, existingComments: CommentRecord[]) {
+  const author = input.author.trim();
+  const body = input.body.trim();
+  const target = input.target.trim();
+  const commentId = `comment-${existingComments.length + 1}-${keySlug(`${author}-${target}`)}`;
+
+  return normalizeComment(
+    {
+      id: commentId,
+      author,
+      body,
+      target,
+      status: "open",
+    },
+    existingComments.length,
+  );
+}
+
+export function buildCommentQueueItem(comment: Pick<CommentRecord, "author" | "body" | "target">) {
+  const summary = comment.body.replace(/\s+/g, " ").trim();
+  const truncatedSummary = summary.length > 88 ? `${summary.slice(0, 85).trimEnd()}...` : summary;
+
+  return `Resolve ${comment.author} review on ${comment.target}: ${truncatedSummary}`;
+}
+
+export function buildCommentActionItem(
+  comment: Pick<CommentRecord, "id" | "author" | "body" | "target">,
+  existingQueue: ActionItem[],
+  dueLabel = "Before export",
+) {
+  return normalizeActionItem(
+    {
+      id: `queue-comment-${comment.id}`,
+      label: buildCommentQueueItem(comment),
+      status: "open",
+      sourceType: "comment",
+      sourceId: comment.id,
+      target: comment.target,
+      owner: "You",
+      dueLabel,
+    },
+    existingQueue.length,
+  );
+}
+
 export function applyWorkspaceIntelligence(project: ProjectRecord) {
   const normalizedSources = (project.workspace.sources ?? []).map(normalizeSource);
+  const normalizedComments = (project.workspace.comments ?? []).map(normalizeComment);
+  const normalizedQueue = ((project.queue ?? []) as Array<ActionItem | string>).map(normalizeActionItem);
   const citationKeysByFile = new Map<string, string[]>();
   const allCitationKeys = new Set<string>();
   const bibliographyKeys = new Set<string>();
@@ -338,6 +431,7 @@ export function applyWorkspaceIntelligence(project: ProjectRecord) {
     ...project.workspace,
     wordEstimate: calculateWordEstimate(project),
     sources,
+    comments: normalizedComments,
     exportProfiles,
     activeExportProfile,
     exportArtifacts: project.workspace.exportArtifacts ?? [],
@@ -352,6 +446,7 @@ export function applyWorkspaceIntelligence(project: ProjectRecord) {
   };
   const nextProject = {
     ...project,
+    queue: normalizedQueue,
     workspace: nextWorkspace,
   };
 

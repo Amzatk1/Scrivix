@@ -62,6 +62,7 @@ export function ProjectBrowser() {
       <section className="project-browser-grid">
         {filteredProjects.map((project) => {
           const template = getTemplateBySlug(project.templateSlug);
+          const openQueue = project.queue.filter((item) => item.status !== "done");
 
           return (
             <article key={project.slug} className="project-browser-card panel">
@@ -82,9 +83,9 @@ export function ProjectBrowser() {
               </div>
 
               <div className="template-highlights">
-                {project.queue.slice(0, 2).map((item) => (
-                  <span key={item} className="template-highlight">
-                    {item}
+                {openQueue.slice(0, 2).map((item) => (
+                  <span key={item.id} className="template-highlight">
+                    {item.label}
                   </span>
                 ))}
               </div>

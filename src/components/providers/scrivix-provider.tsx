@@ -17,7 +17,10 @@ import {
 } from "@/lib/product-data";
 import {
   applyWorkspaceIntelligence,
+  buildCommentActionItem,
+  buildCommentRecord,
   buildSourceRecord,
+  type CommentDraftInput,
   type SourceDraftInput,
 } from "@/lib/document-intelligence";
 import {
@@ -41,14 +44,18 @@ type ScrivixContextValue = {
   createImportedProject: (input: ImportProjectInput) => Promise<ProjectRecord>;
   applyProjectRepair: (projectSlug: string) => Promise<void>;
   compileProject: (projectSlug: string) => Promise<void>;
+  completeProjectQueueItem: (projectSlug: string, queueItem: string) => Promise<void>;
   createProjectSnapshot: (projectSlug: string, snapshotLabel?: string) => Promise<void>;
+  createProjectComment: (projectSlug: string, input: CommentDraftInput) => Promise<void>;
   createProjectFile: (projectSlug: string, fileName: string) => Promise<void>;
   createProjectSource: (projectSlug: string, input: SourceDraftInput) => Promise<void>;
   generateProjectExportArtifact: (projectSlug: string) => Promise<void>;
+  queueProjectComment: (projectSlug: string, commentId: string) => Promise<void>;
   rollbackProjectRepair: (projectSlug: string) => Promise<void>;
   runProjectSubmissionPreflight: (projectSlug: string) => Promise<void>;
   restoreProjectSnapshot: (projectSlug: string, snapshotId: string) => Promise<void>;
   selectProjectExportProfile: (projectSlug: string, profileId: string) => Promise<void>;
+  updateProjectCommentStatus: (projectSlug: string, commentId: string, status: "open" | "resolved") => Promise<void>;
   updateProjectDocument: (projectSlug: string, fileName: string, content: string) => void;
   selectProjectFile: (projectSlug: string, fileName: string) => Promise<void>;
 };
@@ -376,7 +383,7 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
 
           return {
             ...project,
-            meta: "Generating export package…",
+            meta: "Generating export…",
           };
         }),
       );
@@ -399,7 +406,7 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
       });
     } catch {
       startTransition(() => {
-        setSyncError("The export package could not be generated.");
+        setSyncError("The export could not be generated.");
       });
     } finally {
       startTransition(() => {
@@ -642,6 +649,222 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
     }
   }
 
+  async function createProjectComment(projectSlug: string, input: CommentDraftInput) {
+    const author = input.author.trim();
+    const body = input.body.trim();
+    const target = input.target.trim();
+
+    if (!author || !body || !target) {
+      return;
+    }
+
+    startTransition(() => {
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: "Adding comment…",
+            workspace: {
+              ...project.workspace,
+              comments: [
+                {
+                  ...buildCommentRecord(
+                    {
+                      author,
+                      body,
+                      target,
+                    },
+                    project.workspace.comments,
+                  ),
+                  createdAt: "Just now",
+                },
+                ...project.workspace.comments,
+              ],
+            },
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "createComment",
+          comment: {
+            author,
+            body,
+            target,
+          },
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The comment could not be added to the workspace store.");
+      });
+    }
+  }
+
+  async function updateProjectCommentStatus(projectSlug: string, commentId: string, status: "open" | "resolved") {
+    startTransition(() => {
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: status === "resolved" ? "Resolving comment…" : "Reopening comment…",
+            workspace: {
+              ...project.workspace,
+              comments: project.workspace.comments.map((comment) =>
+                comment.id === commentId
+                  ? {
+                      ...comment,
+                      status,
+                    }
+                  : comment,
+              ),
+            },
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "updateCommentStatus",
+          commentId,
+          commentStatus: status,
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The comment status could not be updated.");
+      });
+    }
+  }
+
+  async function queueProjectComment(projectSlug: string, commentId: string) {
+    startTransition(() => {
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          const comment = project.workspace.comments.find((entry) => entry.id === commentId);
+
+          if (!comment) {
+            return project;
+          }
+
+          const queueItem = buildCommentActionItem(comment, project.queue, project.dueLabel || "Before export");
+
+          return {
+            ...project,
+            meta: "Adding action item…",
+            queue: project.queue.some((item) => item.id === queueItem.id || item.sourceId === commentId)
+              ? project.queue
+              : [queueItem, ...project.queue],
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "queueComment",
+          commentId,
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The comment could not be converted into an action item.");
+      });
+    }
+  }
+
+  async function completeProjectQueueItem(projectSlug: string, queueItemId: string) {
+    startTransition(() => {
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => {
+          if (project.slug !== projectSlug) {
+            return project;
+          }
+
+          return {
+            ...project,
+            meta: "Completing action…",
+            queue: project.queue.map((item) =>
+              item.id === queueItemId
+                ? {
+                    ...item,
+                    status: "done",
+                  }
+                : item,
+            ),
+          };
+        }),
+      );
+    });
+
+    try {
+      const response = await requestJson<ApiProjectResponse>(`/api/projects/${projectSlug}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "completeQueueItem",
+          queueItemId,
+        }),
+      });
+
+      startTransition(() => {
+        setProjects((currentProjects) => mergeProject(currentProjects, response.project));
+        setSyncError(null);
+      });
+    } catch {
+      startTransition(() => {
+        setSyncError("The action item could not be updated.");
+      });
+    }
+  }
+
   function updateProjectDocument(projectSlug: string, fileName: string, content: string) {
     startTransition(() => {
       setProjects((currentProjects) =>
@@ -779,14 +1002,18 @@ export function ScrivixProvider({ children }: ScrivixProviderProps) {
         createImportedProject,
         applyProjectRepair,
         compileProject,
+        completeProjectQueueItem,
+        createProjectComment,
         createProjectSnapshot,
         createProjectFile,
         createProjectSource,
         generateProjectExportArtifact,
+        queueProjectComment,
         rollbackProjectRepair,
         runProjectSubmissionPreflight,
         restoreProjectSnapshot,
         selectProjectExportProfile,
+        updateProjectCommentStatus,
         updateProjectDocument,
         selectProjectFile,
       }}
